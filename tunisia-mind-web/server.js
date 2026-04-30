@@ -391,29 +391,42 @@ async function streamAIResponse(messages, res, responseLen) {
 async function performWebSearch(query) {
     try {
         const apiKey = 'dsr_live_4246b2099636c12017f299335e445743bc6145f6c968a16f';
-        const url = `https://www.searchapi.io/api/v1/search?engine=google&q=${encodeURIComponent(query)}&api_key=${apiKey}`;
+        const targetUrl = 'https://intelligent-retrieval-system--yben64993.replit.app/search';
         
-        const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        const res = await fetch(targetUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({ query: query }),
+            signal: AbortSignal.timeout(15000)
+        });
+        
         const data = await res.json();
         
-        if (data?.organic_results?.length > 0) {
-            let context = "\n\n(نتائج بحث مباشرة من الويب):\n";
-            data.organic_results.slice(0, 4).forEach(r => {
-                context += `- **${r.title}**: ${r.snippet}\n  المصدر: ${r.link}\n`;
+        // التحقق من بنية البيانات الراجعة من نظامك
+        if (data && data.results) {
+            let context = "\n\n(نتائج من نظام الاسترجاع الذكي):\n";
+            data.results.slice(0, 4).forEach(r => {
+                context += `- **${r.title || 'نتيجة'}**: ${r.content || r.snippet}\n  المصدر: ${r.url || r.link}\n`;
             });
             return context;
+        } else if (data && data.answer) {
+            // إذا كان النظام يرجع إجابة مباشرة
+            return `\n\n(إجابة من نظام البحث): ${data.answer}\n`;
         }
     } catch (e) { 
-        console.error("SearchApi Error:", e.message); 
+        console.error("Custom Retrieval System Error:", e.message); 
     }
     
-    // Fallback to Wikipedia if SearchApi fails
+    // Fallback to Wikipedia if custom system fails
     try {
         const wikiUrl = `https://ar.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json`;
         const res = await fetch(wikiUrl);
         const data = await res.json();
         if (data?.query?.search?.length > 0) {
-            let context = "\n\n(معلومات من ويكيبيديا):\n";
+            let context = "\n\n(معلومات احتياطية من ويكيبيديا):\n";
             data.query.search.slice(0, 3).forEach(r => {
                 context += `- **${r.title}**: ${r.snippet.replace(/<\/?[^>]+(>|$)/g, "")}\n`;
             });
