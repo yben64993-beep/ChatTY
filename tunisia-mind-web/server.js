@@ -12,7 +12,7 @@ const sharp = require('sharp');
 const { searchKnowledgeBase } = require('./knowledge');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 // Removed node-fetch import because native fetch is fully supported and `const fetch = ...` triggers TS/lint red arrows.// ==========================================
 // حماية الخادم من التوقف المفاجئ (Anti-Crash)
 // ==========================================
@@ -521,6 +521,32 @@ app.get('/api/weather', async (req, res) => {
     } catch (err) { res.status(500).json({ error: 'Weather error' }); }
 });
 
+// دالة مساعدة: توليد slug صالح من النص
+function generateSlug(text) {
+    // تحويل النص العربي/الإنجليزي إلى slug إنجليزي بسيط
+    const words = [
+        'site', 'page', 'web', 'project', 'app', 'portal', 'hub', 'space', 'zone', 'world'
+    ];
+    const randomWord = words[Math.floor(Math.random() * words.length)];
+    const timestamp = Date.now().toString(36).slice(-4); // 4 random chars from timestamp
+    let base = 'tunisian-' + randomWord + '-' + timestamp;
+
+    // إذا كان النص إنجليزياً، استخدمه كأساس
+    if (text && /[a-zA-Z]/.test(text)) {
+        base = text
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .trim()
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .slice(0, 40);
+        if (base.length < 3) base = 'tunisian-' + randomWord + '-' + timestamp;
+        else base = base + '-' + timestamp;
+    }
+
+    return base.slice(0, 62);
+}
+
 app.post('/api/publish-website', async (req, res) => {
     try {
         const deployApiKey = process.env.DEPLOY_API_KEY;
@@ -535,6 +561,14 @@ app.post('/api/publish-website', async (req, res) => {
         }
 
         const payload = req.body;
+
+        // توليد slug تلقائياً إن لم يُرسَل أو كان غير صالح
+        if (!payload.slug || !/^[a-z0-9][a-z0-9-]{1,61}$/.test(payload.slug)) {
+            payload.slug = generateSlug(payload.prompt || '');
+        }
+
+        console.log(`📤 Publishing site with slug: ${payload.slug}`);
+
         const response = await fetch(publishUrl, {
             method: 'POST',
             headers: {
@@ -546,28 +580,31 @@ app.post('/api/publish-website', async (req, res) => {
                 language: 'ar',
                 brand_badge: true
             }),
-            signal: AbortSignal.timeout(60000)
+            signal: AbortSignal.timeout(120000) // رفع المهلة لـ 2 دقيقة لأن توليد الموقع يستغرق وقتاً
         });
 
         // التحقق من نوع الاستجابة قبل محاولة تحليل JSON
-        // بعض الخوادم تُرجع HTML عند الخطأ بدلاً من JSON
         const contentType = response.headers.get('content-type') || '';
         let data;
         if (contentType.includes('application/json')) {
             data = await response.json();
         } else {
             const rawText = await response.text();
-            console.error('Publish server returned non-JSON:', response.status, rawText.slice(0, 200));
+            console.error('Publish server returned non-JSON:', response.status, rawText.slice(0, 300));
             return res.status(response.status || 502).json({
                 success: false,
-                message: `خادم النشر أرجع استجابة غير متوقعة (${response.status}). تأكد من صحة رابط النشر.`
+                message: `خادم النشر أرجع استجابة غير متوقعة (${response.status}). يرجى المحاولة مجدداً.`
             });
         }
 
+        console.log(`📥 Publish response (${response.status}):`, JSON.stringify(data).slice(0, 200));
+
         if (!response.ok) {
+            // data.error أو data.message — Supabase يستخدم data.error
+            const errMsg = data.error || data.message || "حدث خطأ أثناء الاتصال بمنصة النشر";
             return res.status(response.status).json({
                 success: false,
-                message: data.message || "حدث خطأ أثناء الاتصال بمنصة النشر"
+                message: errMsg
             });
         }
 

@@ -104,7 +104,7 @@ window.loadChatHistory = async () => {
         querySnapshot.forEach((doc) => {
             const chat = doc.data();
             const chatId = doc.id;
-            
+
             // Auto-archive maintenance 🧹
             // If chat is older than 7 days, not pinned, and not already archived
             if (now - (chat.updatedAt || 0) > sevenDaysMs && !chat.isPinned && !chat.isArchived) {
@@ -568,9 +568,9 @@ function initWebsiteBuilderLogic() {
 
     submitBtn.onclick = async () => {
         resetFeedback();
-        
+
         let payload = { mode: currentMode };
-        
+
         if (currentMode === 'create') {
             const prompt = document.getElementById('wb-create-prompt').value.trim();
             const slug = document.getElementById('wb-create-slug').value.trim();
@@ -607,7 +607,7 @@ function initWebsiteBuilderLogic() {
                 body: JSON.stringify(payload)
             });
             const data = await response.json();
-            
+
             document.getElementById('wb-loading').style.display = 'none';
             submitBtn.disabled = false;
 
@@ -615,10 +615,10 @@ function initWebsiteBuilderLogic() {
                 const resArea = document.getElementById('wb-result-area');
                 const resMsg = document.getElementById('wb-result-message');
                 const resLink = document.getElementById('wb-result-link');
-                
+
                 resArea.style.display = 'block';
                 resMsg.innerText = data.message || "تم تجهيز الموقع بنجاح!";
-                
+
                 if (data.direct_url) {
                     resLink.href = data.direct_url;
                     resLink.style.display = 'inline-block';
@@ -656,7 +656,7 @@ function initFloatingWelcome() {
     document.getElementById('discoverFeaturesBtn').onclick = () => {
         snack.style.display = 'none';
         localStorage.setItem('tm-welcome-seen-v1', 'true');
-        
+
         // Open settings and go to features tab
         window.showSettings();
         const featBtn = document.querySelector('.snav-btn[data-tab="notifications"]');
