@@ -615,5 +615,76 @@ app.post('/api/publish-website', async (req, res) => {
     }
 });
 
+// ==========================================
+// 🌐 عرض المواقع المنشورة عبر /site/:slug
+// يجلب الموقع من Supabase ويعرضه كـ HTML مُصيَّر
+// ==========================================
+app.get('/site/:slug', async (req, res) => {
+    const { slug } = req.params;
+    const supabaseServeUrl = process.env.SUPABASE_SERVE_URL ||
+        'https://eucunfvrwxeairwkdqwg.supabase.co/functions/v1/serve-site';
+
+    try {
+        const response = await fetch(`${supabaseServeUrl}/${encodeURIComponent(slug)}`, {
+            headers: { 'Accept': 'text/html,application/xhtml+xml,*/*' },
+            signal: AbortSignal.timeout(15000)
+        });
+
+        if (!response.ok) {
+            return res.status(response.status).send(`
+                <!DOCTYPE html><html lang="ar" dir="rtl">
+                <head><meta charset="UTF-8"><title>خطأ</title>
+                <style>body{font-family:Arial,sans-serif;text-align:center;padding:60px;background:#0f0f0f;color:#fff;}
+                h1{color:#ef4444;}a{color:#7c3aed;text-decoration:none;}</style></head>
+                <body><h1>⚠️ الموقع غير موجود</h1>
+                <p>لم يتم العثور على الموقع: <strong>${slug}</strong></p>
+                <a href="/">← العودة للتطبيق</a></body></html>
+            `);
+        }
+
+        const contentType = response.headers.get('content-type') || 'text/html';
+        const body = await response.text();
+
+        // ضبط headers صحيحة لضمان عرض HTML بشكل صحيح في المتصفح
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+        res.send(body);
+
+    } catch (e) {
+        console.error(`Site serve error [${slug}]:`, e.message);
+        res.status(502).send(`
+            <!DOCTYPE html><html lang="ar" dir="rtl">
+            <head><meta charset="UTF-8"><title>خطأ في الاتصال</title>
+            <style>body{font-family:Arial,sans-serif;text-align:center;padding:60px;background:#0f0f0f;color:#fff;}
+            h1{color:#ef4444;}a{color:#7c3aed;text-decoration:none;}</style></head>
+            <body><h1>⚠️ تعذّر تحميل الموقع</h1>
+            <p>حدث خطأ أثناء الاتصال بخادم المواقع. حاول مرة أخرى.</p>
+            <a href="/">← العودة للتطبيق</a></body></html>
+        `);
+    }
+});
+
+// route للمسارات الفرعية داخل الموقع المنشور (مثل /site/my-site/about)
+app.get('/site/:slug/*', async (req, res) => {
+    const { slug } = req.params;
+    const subPath = req.params[0] || '';
+    const supabaseServeUrl = process.env.SUPABASE_SERVE_URL ||
+        'https://eucunfvrwxeairwkdqwg.supabase.co/functions/v1/serve-site';
+
+    try {
+        const response = await fetch(`${supabaseServeUrl}/${encodeURIComponent(slug)}/${subPath}`, {
+            signal: AbortSignal.timeout(15000)
+        });
+
+        const contentType = response.headers.get('content-type') || 'text/html';
+        const body = await response.arrayBuffer();
+
+        res.setHeader('Content-Type', contentType.includes('text/html') ? 'text/html; charset=utf-8' : contentType);
+        res.send(Buffer.from(body));
+    } catch (e) {
+        res.redirect(`/site/${slug}`);
+    }
+});
+
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
