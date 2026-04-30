@@ -665,9 +665,9 @@ app.get('/site/:slug', async (req, res) => {
 });
 
 // route للمسارات الفرعية داخل الموقع المنشور (مثل /site/my-site/about)
-app.get('/site/:slug/*', async (req, res) => {
-    const { slug } = req.params;
-    const subPath = req.params[0] || '';
+app.get(/^\/site\/([^\/]+)\/(.*)/, async (req, res) => {
+    const slug = req.params[0];
+    const subPath = req.params[1] || '';
     const supabaseServeUrl = process.env.SUPABASE_SERVE_URL ||
         'https://eucunfvrwxeairwkdqwg.supabase.co/functions/v1/serve-site';
 
