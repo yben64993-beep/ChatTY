@@ -390,21 +390,36 @@ async function streamAIResponse(messages, res, responseLen) {
 
 async function performWebSearch(query) {
     try {
-        const url = `https://ar.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json`;
-        const res = await fetch(url, {
-            headers: {
-                "User-Agent": "TunisiaMindAI/1.0 (tunisiamindai@gmail.com)"
-            }
-        });
+        const apiKey = 'dsr_live_4246b2099636c12017f299335e445743bc6145f6c968a16f';
+        const url = `https://www.searchapi.io/api/v1/search?engine=google&q=${encodeURIComponent(query)}&api_key=${apiKey}`;
+        
+        const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        const data = await res.json();
+        
+        if (data?.organic_results?.length > 0) {
+            let context = "\n\n(نتائج بحث مباشرة من الويب):\n";
+            data.organic_results.slice(0, 4).forEach(r => {
+                context += `- **${r.title}**: ${r.snippet}\n  المصدر: ${r.link}\n`;
+            });
+            return context;
+        }
+    } catch (e) { 
+        console.error("SearchApi Error:", e.message); 
+    }
+    
+    // Fallback to Wikipedia if SearchApi fails
+    try {
+        const wikiUrl = `https://ar.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json`;
+        const res = await fetch(wikiUrl);
         const data = await res.json();
         if (data?.query?.search?.length > 0) {
-            let context = "\n\n(معلومات إضافية مستخرجة من الويب):\n";
+            let context = "\n\n(معلومات من ويكيبيديا):\n";
             data.query.search.slice(0, 3).forEach(r => {
                 context += `- **${r.title}**: ${r.snippet.replace(/<\/?[^>]+(>|$)/g, "")}\n`;
             });
             return context;
         }
-    } catch (e) { console.error("Web Search Error:", e.message); }
+    } catch (e) {}
     return null;
 }
 
@@ -642,12 +657,12 @@ app.get('/site/:slug', async (req, res) => {
             `);
         }
 
-        const contentType = response.headers.get('content-type') || 'text/html';
-        const body = await response.text();
+        const buffer = await response.arrayBuffer();
+        const body = Buffer.from(buffer).toString('utf-8');
 
-        // ضبط headers صحيحة لضمان عرض HTML بشكل صحيح في المتصفح
+        // ضبط headers صحيحة لضمان عرض HTML بشكل صحيح وبترميز UTF-8
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+        res.setHeader('X-Frame-Options', 'ALLOWALL');
         res.send(body);
 
     } catch (e) {
