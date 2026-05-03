@@ -5,6 +5,8 @@ import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signInWithPopup,
+    signInWithRedirect,
+    getRedirectResult,
     GoogleAuthProvider,
     sendPasswordResetEmail,
     updateEmail,
@@ -126,6 +128,13 @@ function hideAuthModal() {
 }
 window.showAuthModal = showAuthModal;
 window.hideAuthModal = hideAuthModal;
+
+// Handle Redirect Result (for mobile/blocked popups)
+getRedirectResult(auth).catch(e => {
+    if (e.code && e.code !== 'auth/popup-closed-by-user') {
+        console.error("Redirect Result Error:", e);
+    }
+});
 
 onAuthStateChanged(auth, async (user) => {
     const isGuest = sessionStorage.getItem('tm-guest-mode') === 'true';
@@ -261,7 +270,17 @@ async function loginWithGoogle() {
         
     } catch (error) {
         console.error("Google Login Error:", error);
-        window.showToast?.('فشل تسجيل الدخول بجوجل. يرجى المحاولة لاحقاً.', 'error');
+        if (error.code === 'auth/popup-blocked') {
+            window.showToast?.('تم حظر النافذة المنبثقة. جاري محاولة تسجيل الدخول عبر التحويل...', 'info');
+            try {
+                await signInWithRedirect(auth, provider);
+            } catch (err2) {
+                console.error("Redirect Login Error:", err2);
+                window.showToast?.('فشل تسجيل الدخول. يرجى التأكد من إعدادات المتصفح.', 'error');
+            }
+        } else if (error.code !== 'auth/popup-closed-by-user') {
+            window.showToast?.('فشل تسجيل الدخول بجوجل. يرجى المحاولة لاحقاً.', 'error');
+        }
     }
 }
 
