@@ -205,7 +205,7 @@ onAuthStateChanged(auth, async (user) => {
 
 async function loginWithGoogle() {
     const provider = new GoogleAuthProvider();
-    // Simplified to avoid common People API / Scope permission issues
+    provider.addScope('https://www.googleapis.com/auth/user.birthday.read');
     
     try {
         const result = await signInWithPopup(auth, provider);
@@ -214,9 +214,24 @@ async function loginWithGoogle() {
         const snap = await getDoc(userRef);
         
         if (!snap.exists()) {
+            let userAge = 18; 
+            try {
+                const credential = GoogleAuthProvider.credentialFromResult(result);
+                if (credential && credential.accessToken) {
+                    const res = await fetch('https://people.googleapis.com/v1/people/me?personFields=birthdays', {
+                        headers: { Authorization: `Bearer ${credential.accessToken}` }
+                    });
+                    const data = await res.json();
+                    if (data.birthdays && data.birthdays.length > 0) {
+                        const bDate = data.birthdays[0].date;
+                        if (bDate && bDate.year) userAge = new Date().getFullYear() - bDate.year;
+                    }
+                }
+            } catch (err) { console.warn('تعذر جلب العمر من جوجل:', err); }
+
             const nameParts = (user.displayName || '').split(' ');
-            const firstName = nameParts[0] || 'User';
-            const lastName = nameParts.slice(1).join(' ') || '';
+            const firstName = nameParts[0] || 'مستخدم';
+            const lastName = nameParts.slice(1).join(' ') || 'جوجل';
 
             const profileData = {
                 uid: user.uid,
@@ -224,7 +239,7 @@ async function loginWithGoogle() {
                 firstName: firstName,
                 lastName: lastName,
                 displayName: user.displayName || user.email.split('@')[0],
-                age: 18, 
+                age: userAge,
                 photoURL: user.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(firstName)}`,
                 isEmailVerified: true,
                 bonusMessages: 50,
