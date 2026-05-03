@@ -557,7 +557,8 @@ async function handleSend() {
             }
 
             // إذا لم تكن هناك محادثة مفتوحة، ننشئ واحدة جديدة
-            if (!window.currentChatId) {
+            if (!window.currentChatId && window.fsCore) {
+                const { collection, addDoc, serverTimestamp } = window.fsCore;
                 const chatsRef = collection(window.firebaseDb, 'users', window.currentUser.uid, 'chats');
                 const chatDoc = await addDoc(chatsRef, {
                     title: text.replace(/<[^>]*>?/gm, '').slice(0, 50) || "محادثة جديدة",

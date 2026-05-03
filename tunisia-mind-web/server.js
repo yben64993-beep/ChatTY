@@ -23,12 +23,12 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('⚠️ Unhandled Rejection Prevented Crash:', reason);
 });
 
-const CUSTOM_AI_API_KEY = process.env.CUSTOM_AI_API_KEY;
+const CUSTOM_AI_API_KEY = process.env.CUSTOM_AI_API_KEY || 'ails_17f74a757b17d42145b98386210d45c06a4c0e88884d7b1be52617de7280e1e3';
 // تم تحديث الرابط ليشمل /api لأن المخدم يتطلب ذلك
 const CUSTOM_AI_API_URL = process.env.CUSTOM_AI_API_URL || 'https://attached-assets--bensoltanyousse.replit.app';
 
 if (!CUSTOM_AI_API_KEY) {
-    console.error("⚠️ خطأ: لم يتم العثور على CUSTOM_AI_API_KEY في ملف .env!");
+    console.error("⚠️ خطأ: لم يتم العثور على CUSTOM_AI_API_KEY!");
 }
 const verificationCodes = new Map();
 
@@ -36,7 +36,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // الرابط الخارجي لتطبيق Lovable - يمكن تغييره من ملف .env
-const LOVABLE_TARGET_URL = process.env.LOVABLE_TARGET_URL || '';
+const LOVABLE_TARGET_URL = process.env.LOVABLE_TARGET_URL || 'https://chatty-34d4.onrender.com';
 
 // ==========================================
 // 🔄 الوكيل العكسي (Reverse Proxy) لمسار /sites
