@@ -69,7 +69,45 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('settingsBtn')?.addEventListener('click', () => {
         const lang = localStorage.getItem('tunisiaLang') || 'ar';
         if (window.applyTranslations) window.applyTranslations(lang);
+
+        // Load user data into profile tab
+        const profile = window.currentUserProfile || {};
+        const user = window.currentUser;
+
+        if (document.getElementById('profileFirstName')) {
+            document.getElementById('profileFirstName').value = profile.firstName || '';
+            document.getElementById('profileLastName').value = profile.lastName || '';
+            document.getElementById('profileAge').value = profile.age || '';
+            document.getElementById('profileEmail').value = (user && user.email) || '';
+        }
+
+        // Show userId
+        const userIdGroup = document.getElementById('userIdGroup');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        if (userIdGroup && userIdDisplay && profile.userId) {
+            userIdGroup.style.display = 'block';
+            userIdDisplay.textContent = profile.userId;
+        }
     }, { capture: true });
+
+    // Copy User ID button
+    document.getElementById('copyUserIdBtn')?.addEventListener('click', () => {
+        const idText = document.getElementById('userIdDisplay')?.textContent;
+        if (idText && idText !== '---------') {
+            navigator.clipboard.writeText(idText).then(() => {
+                const btn = document.getElementById('copyUserIdBtn');
+                btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+                setTimeout(() => { btn.innerHTML = '<i class="fa-solid fa-copy"></i>'; }, 1500);
+            }).catch(() => {
+                // Fallback
+                const el = document.getElementById('userIdDisplay');
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                window.getSelection().removeAllRanges();
+                window.getSelection().addRange(range);
+            });
+        }
+    });
 
 
 
@@ -100,7 +138,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const subject = subEl.value;
         const msg = msgEl.value;
         if (!subject || !msg) { window.showToast?.('يرجى ملء الموضوع والرسالة', 'error'); return; }
-        const link = `mailto:tunisiamindai@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`;
+
+        // Build identity header with userId, firstName, lastName
+        const profile = window.currentUserProfile || {};
+        const userId = profile.userId || 'غير محدد';
+        const firstName = profile.firstName || '';
+        const lastName = profile.lastName || '';
+        const fullName = `${firstName} ${lastName}`.trim() || 'غير محدد';
+
+        const identityBlock = [
+            `═══ معلومات المستخدم ═══`,
+            `المعرّف: ${userId}`,
+            `الاسم: ${fullName}`,
+            `البريد: ${window.currentUser?.email || 'غير محدد'}`,
+            `════════════════════════`,
+            ``,
+            msg
+        ].join('\n');
+
+        const link = `mailto:tunisiamindai@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(identityBlock)}`;
         window.open(link);
         window.showToast?.('يتم فتح برنامج البريد...', 'success');
         // Clear fields

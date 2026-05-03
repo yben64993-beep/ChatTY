@@ -12,15 +12,24 @@ let attachedVideoFrames = null;
 let attachedFileContent = null;
 let attachedFileName = null;
 let chatAbortController = null;
-let userInsights = JSON.parse(localStorage.getItem('tm-insights') || '{"msgTotal":0, "topics":{}}');
-window.isSearchMode = false;
-
-// Suggestion window function removed.
-window.currentActivePersona = 'ليلى';
 
 const API_BASE_URL = window.location.origin;
 
 // ========== الدوال المساعدة ==========
+window.showToast = (msg, type = 'info') => {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.className = `toast show ${type}`;
+    setTimeout(() => t.className = 'toast', 3000);
+};
+
+window.showFutureUpdate = () => {
+    const lang = localStorage.getItem('mindtyLang') || 'ar';
+    const msg = window.translations?.[lang]?.future_update || window.translations?.['ar']?.future_update;
+    window.showToast(msg, 'info');
+};
+
 
 function hideWelcome() {
     if (welcomeScreen) welcomeScreen.style.display = 'none';
@@ -154,6 +163,7 @@ function appendMessage(content, sender, isHtml = false) {
 
     applyPlugins(contentDiv);
     scrollToBottom();
+    if (window.updateQuotaDisplay) window.updateQuotaDisplay();
     return msgDiv;
 }
 
@@ -208,7 +218,8 @@ async function startAsyncImageGeneration(prompt) {
         const res = await fetch(`${API_BASE_URL}/api/generate-image`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt })
+            body: JSON.stringify({ prompt: prompt }),
+            signal: AbortSignal.timeout(65000) // 65 seconds timeout
         });
         const data = await res.json();
         
@@ -239,20 +250,6 @@ async function startAsyncImageGeneration(prompt) {
             }
         };
 
-        // Lightbox global functions
-        window.openLightbox = (url) => {
-            const lBox = document.getElementById('imageLightbox');
-            const lImg = document.getElementById('lightboxImg');
-            if (lBox && lImg) {
-                lImg.src = url;
-                lBox.classList.add('active');
-            }
-        };
-        window.closeLightbox = () => {
-            const lBox = document.getElementById('imageLightbox');
-            if (lBox) lBox.classList.remove('active');
-        };
-
         if (earlyImgUrl) {
             renderImage(earlyImgUrl);
             return;
@@ -273,7 +270,9 @@ async function startAsyncImageGeneration(prompt) {
             }
 
             try {
-                let sRes = await fetch(`${API_BASE_URL}/api/image-status/${jobId}`);
+                let sRes = await fetch(`${API_BASE_URL}/api/image-status/${jobId}`, {
+                    signal: AbortSignal.timeout(10000) // 10 seconds for status check
+                });
                 if (!sRes.ok) throw new Error("فشل الاتصال بالخادم للتحقق من الحالة.");
                 let sData = await sRes.json();
                 
@@ -315,14 +314,43 @@ async function handleSend() {
         const text = messageInput.value.trim();
         if (!text && !attachedFileContent && !attachedImage) return;
 
-        if (window.currentUserProfile && window.fsCore) {
-            let limit = window.currentUserProfile.bonusMessages || 0;
-            if (limit <= 0) {
-                window.showToast?.('لقد نفذت نقاطك (عدد الرسائل المجانية المتبقية: 0).', 'error');
+        // التحقق من حدود المحادثات والرسائل
+        const lang = localStorage.getItem('mindtyLang') || 'ar';
+        const trans = window.translations?.[lang] || window.translations?.['ar'];
+
+        // 1. الحد اليومي للمحادثات (5 محادثات في اليوم)
+        const today = new Date().toLocaleDateString();
+        const chatLimitKey = `mindty_daily_chats_${today}`;
+        const dailyChats = parseInt(localStorage.getItem(chatLimitKey) || "0");
+
+        if (!window.currentChatId && dailyChats >= 5) {
+            // إظهار نافذة منبثقة للحد اليومي
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay active';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="settings-card" style="text-align:center; padding:30px;">
+                    <i class="fa-solid fa-calendar-day" style="font-size:4rem; color:var(--accent-color); margin-bottom:20px;"></i>
+                    <h2 style="margin-bottom:15px;">${trans.daily_limit_reached}</h2>
+                    <p style="opacity:0.8; margin-bottom:25px;">لقد استمتعت بـ 5 محادثات ذكية اليوم. يمكنك العودة غداً للمزيد من الإبداع!</p>
+                    <button class="btn-primary" onclick="this.closest('.modal-overlay').remove()">فهمت ذلك</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            isProcessing = false;
+            return;
+        }
+
+        // 2. حد الرسائل في المحادثة الواحدة (100 رسالة)
+        if (window.currentChatId) {
+            const msgCount = document.querySelectorAll('#messagesWrapper .message.user').length;
+            if (msgCount >= 100) {
+                appendMessage(trans.chat_limit_reached, 'ai');
                 isProcessing = false;
                 return;
             }
         }
+
 
         const drawRegex = /^\s*(?:لو\s+سمحت\s*|من\s+فضلك\s*|ممكن\s*|هل\s+بإمكانك\s*|هل\s+تستطيع\s*|please\s+|can\s+you\s+)?(?:ارسم|إرسم|تخيل|صمم|اصنع|أنشئ|ولد|توليد|draw|imagine|create|generate|make)(?:\s+لي|\s+لنا|me|for me)?(?:\s*صورة|\s*رسمة|\s*لـ|\s*ل|image|picture)?(?:(.*))?$/i;
         let match = text.trim().match(drawRegex);
@@ -338,6 +366,7 @@ async function handleSend() {
             messageInput.style.height = 'auto'; 
             hideWelcome();
             appendMessage(text, 'user');
+            window.saveMessageToCurrentChat?.(text, 'user', false);
             
             // Clean common Arabic prepositions at the start e.g. "لموزة" -> "موزة"
             if (promptContent.startsWith('ل') && promptContent.length > 2 && /[\u0600-\u06FF]/.test(promptContent)) {
@@ -432,8 +461,8 @@ async function handleSend() {
             let finalPrompt = text;
             if (attachedFileContent) {
                  finalPrompt = text.trim() 
-                    ? `${text}\n\n[الملف المرفق للمساعدة في الإجابة]:\n${attachedFileContent}` 
-                    : `مرحباً، تفضل هذا الملف المرفق. الرجاء تحليله وشرح محتواه لي بالتفصيل وباللغة العربية:\n\n[محتوى الملف]:\n${attachedFileContent}`;
+                    ? `[تم إرفاق ملف للتحليل: ${attachedFileName}]\n${text}\n\nمحتوى الملف:\n${attachedFileContent}` 
+                    : `مرحباً، لقد قمت بإرفاق ملف بعنوان (${attachedFileName}). الرجاء تحليله بعناية، شرح فكرته الأساسية، استخراج أهم المعلومات منه، وتقديم ملخص مفصل باللغة العربية. إذا كان كوداً برمجياً، فقم بشرح وظيفته وكيفية عمله.`;
             }
 
             // Removed Persona Memory
@@ -455,7 +484,6 @@ async function handleSend() {
                     prompt: finalPrompt,
                     history: history,
                     stream: true,
-                    persona: window.currentActivePersona,
                     userContext: uc,
                     image: attachedVideoFrames || attachedImage,
                     responseLen: currentResponseLen
@@ -489,7 +517,7 @@ async function handleSend() {
                         aiContentDiv.innerHTML = formatMarkdown(fullAiResponse);
                         scrollToBottom();
                         // Small delay for 'word-by-word' effect
-                        await new Promise(r => setTimeout(r, 20));
+                        await new Promise(r => setTimeout(r, 10));
                     }
                     isDisplaying = false;
                 }
@@ -528,8 +556,24 @@ async function handleSend() {
                 aiContentDiv.innerHTML = formatMarkdown(fullAiResponse);
             }
 
-            // Removed Memory Extraction
+            // إذا لم تكن هناك محادثة مفتوحة، ننشئ واحدة جديدة
+            if (!window.currentChatId) {
+                const chatsRef = collection(window.firebaseDb, 'users', window.currentUser.uid, 'chats');
+                const chatDoc = await addDoc(chatsRef, {
+                    title: text.replace(/<[^>]*>?/gm, '').slice(0, 50) || "محادثة جديدة",
+                    updatedAt: Date.now(),
+                    isPinned: false,
+                    isArchived: false,
+                    createdAt: serverTimestamp()
+                });
+                window.currentChatId = chatDoc.id;
 
+                // تحديث عداد المحادثات اليومية
+                const today = new Date().toLocaleDateString();
+                const chatLimitKey = `mindty_daily_chats_${today}`;
+                const currentDaily = parseInt(localStorage.getItem(chatLimitKey) || "0");
+                localStorage.setItem(chatLimitKey, currentDaily + 1);
+            }
 
             applyPlugins(aiContentDiv);
 
@@ -546,26 +590,37 @@ async function handleSend() {
 
             // حفظ رد الذكاء الاصطناعي
             if (fullAiResponse) window.saveMessageToCurrentChat?.(fullAiResponse.trim(), 'ai');
-            if (window.renderWelcomeStats) window.renderWelcomeStats();
 
             // Deduct points
             if (window.currentUserProfile && window.fsCore) {
-                try {
-                    const { doc, updateDoc, increment } = window.fsCore;
-                    const userRef = doc(window.firebaseDb, 'users', window.currentUser.uid);
-                    await updateDoc(userRef, {
-                        msgCount: increment(1),
-                        bonusMessages: increment(-1)
-                    });
-                    window.currentUserProfile.msgCount = (window.currentUserProfile.msgCount || 0) + 1;
+                if (window.currentUserProfile.isGuest) {
+                    // Guest quota deduction in localStorage
                     window.currentUserProfile.bonusMessages = Math.max(0, (window.currentUserProfile.bonusMessages || 0) - 1);
+                    localStorage.setItem('tm-guest-bonus', window.currentUserProfile.bonusMessages);
                     if(window.updateQuotaDisplay) window.updateQuotaDisplay();
-                } catch(err) {
-                    console.error('Error updating quota:', err);
+                } else {
+                    try {
+                        const { doc, updateDoc, increment } = window.fsCore;
+                        const userRef = doc(window.firebaseDb, 'users', window.currentUser.uid);
+                        await updateDoc(userRef, {
+                            msgCount: increment(1),
+                            bonusMessages: increment(-1)
+                        });
+                        window.currentUserProfile.msgCount = (window.currentUserProfile.msgCount || 0) + 1;
+                        window.currentUserProfile.bonusMessages = Math.max(0, (window.currentUserProfile.bonusMessages || 0) - 1);
+                        if(window.updateQuotaDisplay) window.updateQuotaDisplay();
+                    } catch(err) {
+                        console.error('Error updating quota:', err);
+                    }
                 }
             }
 
         } catch (error) {
+            if (error.name === 'AbortError') return;
+            if (fullAiResponse) {
+                console.warn('Minor stream error after successful response:', error);
+                return;
+            }
             console.error('Chat Error:', error);
             appendMessage('⚠️ خطأ في الاتصال.', 'ai');
         } finally {
@@ -642,12 +697,15 @@ function initChat() {
     // attachBtnAlpha no longer directly clicks fileIn, it opens the menu via inline onclick in index.html
     const fileIn = document.getElementById('fileInputAlpha');
     const imageIn = document.getElementById('imageInput');
+    const videoIn = document.getElementById('videoInput');
+
     if (fileIn) {
         fileIn.onchange = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            // Limit file size to 10MB for PDFs, 2MB for others
-            const limit = file.type === 'application/pdf' ? 10 * 1024 * 1024 : 2 * 1024 * 1024;
+
+            // Increase limit to 20MB for most files
+            const limit = 20 * 1024 * 1024;
             if (file.size > limit) {
                 window.showToast?.(`حجم الملف كبير جداً (الحد الأقصى ${limit / (1024 * 1024)}MB)`, 'error');
                 fileIn.value = '';
@@ -655,10 +713,14 @@ function initChat() {
             }
 
             attachedFileName = file.name;
+            const ext = file.name.split('.').pop().toLowerCase();
 
-            if (file.type === 'application/pdf') {
-                window.showToast?.('جاري استخراج النص من PDF...', 'info');
-                try {
+            const lang = window.currentLang || localStorage.getItem('mindtyLang') || 'ar';
+            const t = window.translations?.[lang] || window.translations?.['ar'];
+
+            try {
+                if (ext === 'pdf') {
+                    window.showToast?.(t.processing_pdf, 'info');
                     const arrayBuffer = await file.arrayBuffer();
                     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                     let text = `[محتوى ملف PDF: ${file.name}]\n\n`;
@@ -669,46 +731,93 @@ function initChat() {
                         text += `--- الصفحة ${i} ---\n` + strings.join(' ') + '\n\n';
                     }
                     attachedFileContent = text;
-                    const preview = document.getElementById('imagePreviewContainer');
-                    if (preview) preview.style.display = 'flex';
-                    const imgPre = document.getElementById('imagePreviewImg');
-                    if (imgPre) imgPre.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24"><path fill="%23ef4444" d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8.5 7.5c0 .83-.67 1.5-1.5 1.5H9v2H7.5V7H10c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V7H15c.83 0 1.5.67 1.5 1.5v3zm4-3.5h-1.25V13H17.75V7h2v1.5z"/></svg>';
-                    window.showToast?.('✅ تم استخراج النص بنجاح!', 'success');
-                } catch(err) {
-                    console.error('PDF Error:', err);
-                    window.showToast?.('خطأ في قراءة ملف PDF', 'error');
+                    updateFilePreview('pdf');
+                    window.showToast?.(t.ready_for_analysis, 'success');
+                } 
+                else if (ext === 'docx') {
+                    window.showToast?.(t.processing_word, 'info');
+                    const arrayBuffer = await file.arrayBuffer();
+                    const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+                    attachedFileContent = `[محتوى مستند Word: ${file.name}]\n\n${result.value}`;
+                    updateFilePreview('word');
+                    window.showToast?.(t.ready_for_analysis, 'success');
                 }
-            } else {
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    if (file.type.startsWith('image/')) {
+                else if (['xlsx', 'xls', 'csv'].includes(ext)) {
+                    window.showToast?.(t.processing_excel, 'info');
+                    const arrayBuffer = await file.arrayBuffer();
+                    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                    let text = `[محتوى ملف بيانات: ${file.name}]\n\n`;
+                    workbook.SheetNames.forEach(sheetName => {
+                        text += `--- ورقة: ${sheetName} ---\n`;
+                        const sheet = workbook.Sheets[sheetName];
+                        text += XLSX.utils.sheet_to_csv(sheet) + '\n\n';
+                    });
+                    attachedFileContent = text;
+                    updateFilePreview('excel');
+                    window.showToast?.(t.ready_for_analysis, 'success');
+                }
+                else if (['js', 'py', 'html', 'css', 'json', 'txt', 'c', 'cpp', 'java', 'php', 'rb', 'go', 'rs', 'ts'].includes(ext)) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        attachedFileContent = `[محتوى ملف برمجى/نصي: ${file.name}]\n\n\`\`\`${ext}\n${ev.target.result}\n\`\`\``;
+                        updateFilePreview('code');
+                        window.showToast?.(`${t.processing_code}: ${file.name}`, 'success');
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                }
+                else if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
                         attachedImage = ev.target.result;
-                        const img = document.getElementById('imagePreviewImg');
-                        if (img) img.src = ev.target.result;
-                    } else {
-                        attachedFileContent = ev.target.result;
-                        const img = document.getElementById('imagePreviewImg');
-                        if (img) img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24"><path fill="%2310b981" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>';
-                    }
-                    const preview = document.getElementById('imagePreviewContainer');
-                    if (preview) preview.style.display = 'flex';
-                    window.showToast?.(`✅ تم إرفاق: ${file.name}`, 'success');
-                };
-                reader.onerror = () => {
-                    window.showToast?.('فشل قراءة الملف', 'error');
-                    fileIn.value = '';
-                };
-                if (file.type.startsWith('image/')) reader.readAsDataURL(file);
-                else reader.readAsText(file, 'UTF-8');
+                        updateFilePreview('image', ev.target.result);
+                        window.showToast?.(`✅ ${file.name}`, 'success');
+                    };
+                    reader.readAsDataURL(file);
+                }
+                else {
+                    // Generic text reader for unknown types
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        attachedFileContent = `[محتوى ملف (${file.name})]:\n\n${ev.target.result}`;
+                        updateFilePreview('file');
+                        window.showToast?.(`✅ ${file.name}`, 'success');
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                }
+            } catch (err) {
+                console.error('File Processing Error:', err);
+                window.showToast?.('Error analyzing file.', 'error');
             }
         };
     }
+
+    function updateFilePreview(type, src = null) {
+        const preview = document.getElementById('imagePreviewContainer');
+        const imgPre = document.getElementById('imagePreviewImg');
+        if (!preview || !imgPre) return;
+
+        preview.style.display = 'flex';
+        if (type === 'image' && src) {
+            imgPre.src = src;
+        } else if (type === 'pdf') {
+            imgPre.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24"><path fill="%23ef4444" d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8.5 7.5c0 .83-.67 1.5-1.5 1.5H9v2H7.5V7H10c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V7H15c.83 0 1.5.67 1.5 1.5v3zm4-3.5h-1.25V13H17.75V7h2v1.5z"/></svg>';
+        } else if (type === 'word') {
+            imgPre.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24"><path fill="%232b579a" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-2 13h-2v-2h2v2zm0-4h-2V9h2v2zm3-5.5V9h-5.5L12 3.5z"/></svg>';
+        } else if (type === 'excel') {
+            imgPre.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24"><path fill="%23217346" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>';
+        } else if (type === 'code') {
+            imgPre.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24"><path fill="%2310b981" d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>';
+        } else {
+            imgPre.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24"><path fill="%236b7280" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>';
+        }
+    }
+
     if (imageIn) {
         imageIn.onchange = (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            if (file.size > 5 * 1024 * 1024) {
-                window.showToast?.('حجم الصورة كبير جداً (الحد الأقصى 5MB)', 'error');
+            if (file.size > 10 * 1024 * 1024) {
+                window.showToast?.('Image too large (Max 10MB)', 'error');
                 imageIn.value = '';
                 return;
             }
@@ -716,19 +825,77 @@ function initChat() {
             const reader = new FileReader();
             reader.onload = (ev) => {
                 attachedImage = ev.target.result;
-                const preview = document.getElementById('imagePreviewContainer');
-                if (preview) preview.style.display = 'flex';
-                const img = document.getElementById('imagePreviewImg');
-                if (img) img.src = ev.target.result;
-                window.showToast?.(`✅ تم إرفاق الصورة: ${file.name}`, 'success');
-            };
-            reader.onerror = () => {
-                window.showToast?.('فشل تحميل الصورة', 'error');
-                imageIn.value = '';
+                updateFilePreview('image', ev.target.result);
+                window.showToast?.(`✅ ${file.name}`, 'success');
             };
             reader.readAsDataURL(file);
         };
     }
+
+    if (videoIn) {
+        videoIn.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (file.size > 50 * 1024 * 1024) {
+                window.showToast?.('Video too large (Max 50MB)', 'error');
+                videoIn.value = '';
+                return;
+            }
+
+            const lang = window.currentLang || localStorage.getItem('mindtyLang') || 'ar';
+            const t = window.translations?.[lang] || window.translations?.['ar'];
+
+            const videoUrl = URL.createObjectURL(file);
+            const tempVid = document.createElement('video');
+            tempVid.src = videoUrl;
+            tempVid.muted = true;
+            tempVid.play();
+
+            tempVid.onloadedmetadata = async () => {
+                if (tempVid.duration > 60) { 
+                    window.showToast?.('Max video duration is 60s.', 'error');
+                    videoIn.value = '';
+                    return;
+                }
+                window.showToast?.(t.processing_video, 'info');
+                const frames = await extractFrames(tempVid);
+                attachedVideoFrames = frames;
+                attachedFileName = file.name;
+                updateFilePreview('image', frames[0]);
+                window.showToast?.(t.ready_for_analysis, 'success');
+                tempVid.pause();
+                URL.revokeObjectURL(videoUrl);
+            };
+        };
+    }
+
+    async function extractFrames(videoElem) {
+        return new Promise(async (resolve) => {
+            const canvas = document.getElementById('hiddenCanvas') || document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const frames = [];
+            const duration = videoElem.duration;
+            
+            // Extract exactly 10 frames distributed across the video
+            const frameCount = 10;
+            const interval = duration / (frameCount - 1);
+            
+            for (let i = 0; i < frameCount; i++) {
+                videoElem.currentTime = i * interval;
+                await new Promise(r => videoElem.onseeked = r);
+                
+                // Scale down for faster API processing
+                const scale = Math.min(1, 512 / Math.max(videoElem.videoWidth, videoElem.videoHeight));
+                canvas.width = videoElem.videoWidth * scale;
+                canvas.height = videoElem.videoHeight * scale;
+                
+                ctx.drawImage(videoElem, 0, 0, canvas.width, canvas.height);
+                frames.push(canvas.toDataURL('image/jpeg', 0.7));
+            }
+            resolve(frames);
+        });
+    }
+
 
     // Cancel image/file preview
     const cancelPreviewBtn = document.getElementById('cancelImagePreviewBtn');
@@ -748,56 +915,6 @@ function initChat() {
             if (videoIn) videoIn.value = '';
         };
     }
-
-    // Video Analysis Handler
-    const videoIn = document.getElementById('videoInput');
-    if (videoIn) {
-        videoIn.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const videoUrl = URL.createObjectURL(file);
-            const tempVid = document.createElement('video');
-            tempVid.src = videoUrl;
-            tempVid.onloadedmetadata = async () => {
-                if (tempVid.duration > 25) { 
-                    window.showToast?.('عذراً، الحد الأقصى للفيديو هو 20 ثانية.', 'error');
-                    videoIn.value = '';
-                    return;
-                }
-                window.showToast?.('جاري تحويل الفيديو للتحليل... يرجى الانتظار ⏳', 'success');
-                const frames = await extractFrames(tempVid);
-                attachedVideoFrames = frames;
-                attachedFileName = file.name;
-                const preview = document.getElementById('imagePreviewContainer');
-                if (preview) preview.style.display = 'flex';
-                const imgPre = document.getElementById('imagePreviewImg');
-                if (imgPre) imgPre.src = frames[0];
-                window.showToast?.('✅ جاهز للتحليل!', 'success');
-            };
-        };
-    }
-
-    async function extractFrames(videoElem) {
-        return new Promise(async (resolve) => {
-            const canvas = document.getElementById('hiddenCanvas');
-            const ctx = canvas.getContext('2d');
-            const frames = [];
-            const duration = videoElem.duration;
-            const step = 1; 
-            
-            videoElem.currentTime = 0;
-            for (let t = 0; t <= duration; t += step) {
-                videoElem.currentTime = t;
-                await new Promise(r => videoElem.onseeked = r);
-                canvas.width = videoElem.videoWidth / 2;
-                canvas.height = videoElem.videoHeight / 2;
-                ctx.drawImage(videoElem, 0, 0, canvas.width, canvas.height);
-                frames.push(canvas.toDataURL('image/jpeg', 0.6));
-            }
-            resolve(frames);
-        });
-    }
-
 
     // Auto-resize textarea
     if (messageInput) {
@@ -829,7 +946,7 @@ window.runCode = (lang, code) => {
         return;
     }
 
-    runWindow.document.write('<html><head><title>تشغيل الكود - Tunisia Mind 🚀</title><meta charset="utf-8">');
+    runWindow.document.write('<html><head><title>تشغيل الكود - MindTY 🚀</title><meta charset="utf-8">');
     runWindow.document.write('<style>body{margin:0; font-family:"Segoe UI", Tahoma, Geneva, Verdana, sans-serif; background:#1e1e1e; color:#ccc;} .app-header {background:#2d2d2d; padding:10px 20px; font-weight:bold; color:white; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center;}</style>');
     runWindow.document.write('</head><body>');
 
@@ -1002,7 +1119,7 @@ window.exportToPDF = () => {
     const header = document.createElement('h2');
     header.style.textAlign = 'center';
     header.style.color = '#10b981';
-    header.innerText = 'محادثة ذكية - العقل التونسي AI';
+    header.innerText = 'محادثة ذكية - MindTY AI';
     printArea.prepend(header);
 
     const opt = {
@@ -1025,11 +1142,11 @@ window.exportToText = () => {
         return alert("لا توجد محادثة لتصديرها.");
     }
 
-    let textContent = "محادثة ذكية - العقل التونسي AI\n\n";
+    let textContent = "محادثة ذكية - MindTY AI\n\n";
     const messages = chatContainer.querySelectorAll('.message');
     messages.forEach(msg => {
         const isUser = msg.classList.contains('user');
-        const sender = isUser ? "أنت" : "العقل التونسي AI";
+        const sender = isUser ? "أنت" : "MindTY AI";
         const contentNode = msg.querySelector('.msg-content');
         if(contentNode) {
             let text = contentNode.innerText.trim();
@@ -1084,7 +1201,7 @@ window.exportToImage = () => {
         const header = document.createElement('h2');
         header.style.textAlign = 'center';
         header.style.color = '#10b981';
-        header.innerText = 'محادثة ذكية - العقل التونسي AI';
+        header.innerText = 'محادثة ذكية - MindTY AI';
         printArea.prepend(header);
 
         document.body.appendChild(printArea);

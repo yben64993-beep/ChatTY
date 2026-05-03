@@ -42,8 +42,8 @@ function setLanguage(lang, dir) {
   const finalDir = dir || trans.dir || (lang === 'ar' ? 'rtl' : 'ltr');
 
   // Save preference
-  localStorage.setItem('tunisiaLang', lang);
-  localStorage.setItem('tunisiaDirection', finalDir);
+  localStorage.setItem('mindtyLang', lang);
+  localStorage.setItem('mindtyDirection', finalDir);
 
   // Update DOM direction & lang
   document.documentElement.lang = lang;
@@ -65,12 +65,12 @@ function setLanguage(lang, dir) {
 // Make functions global so settings.js and others can call them
 window.applyTranslations = applyTranslations;
 window.setLanguage = setLanguage;
-window.getCurrentLang = () => localStorage.getItem('tunisiaLang') || 'ar';
+window.getCurrentLang = () => localStorage.getItem('mindtyLang') || 'ar';
 
 document.addEventListener('DOMContentLoaded', () => {
   // Set initial language from storage or default to Arabic
-  const savedLang = localStorage.getItem('tunisiaLang') || 'ar';
-  const savedDir = localStorage.getItem('tunisiaDirection') || 'rtl';
+  const savedLang = localStorage.getItem('mindtyLang') || 'ar';
+  const savedDir = localStorage.getItem('mindtyDirection') || 'rtl';
   setLanguage(savedLang, savedDir);
 
   // Add event listeners to language buttons
@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Re-apply translations after a small delay to catch any late-rendered elements
   setTimeout(() => {
-    const lang = localStorage.getItem('tunisiaLang') || 'ar';
+    const lang = localStorage.getItem('mindtyLang') || 'ar';
     applyTranslations(lang);
   }, 500);
 });

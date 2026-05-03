@@ -1,7 +1,7 @@
 {
-  "name": "العقل التونسي AI",
-  "short_name": "TunisiaMind",
-  "description": "منصة الذكاء الاصطناعي التونسية الأكثر تقدماً",
+  "name": "MindTY AI",
+  "short_name": "MindTY",
+  "description": "منصة الذكاء الاصطناعي الأكثر تقدماً - MindTY",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#111827",

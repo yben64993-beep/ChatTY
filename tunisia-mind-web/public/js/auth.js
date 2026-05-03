@@ -37,6 +37,7 @@ const db = getFirestore(app);
 
 // Ensure auth state persists across page reloads
 setPersistence(auth, browserLocalPersistence).catch(e => console.warn('Persistence warning:', e));
+auth.useDeviceLanguage(); // Set language to user's browser language
 
 window.firebaseAuth = auth;
 window.firebaseDb = db;
@@ -113,15 +114,6 @@ setTimeout(attachAllLogoutButtons, 3000);
 
 window.currentUser = null;
 window.currentUserProfile = {};
-window.showToast = showToast;
-
-function showToast(msg, type = 'success') {
-    const toast = document.getElementById('toast');
-    if (!toast) return;
-    toast.textContent = msg;
-    toast.className = `toast show ${type}`;
-    setTimeout(() => toast.classList.remove('show'), 3500);
-}
 
 function showAuthModal() {
     if (document.getElementById('splashScreen')) return;
@@ -136,7 +128,10 @@ window.showAuthModal = showAuthModal;
 window.hideAuthModal = hideAuthModal;
 
 onAuthStateChanged(auth, async (user) => {
+    const isGuest = sessionStorage.getItem('tm-guest-mode') === 'true';
+    
     if (user) {
+        sessionStorage.removeItem('tm-guest-mode'); // Clear guest mode if logged in
         try {
             const snap = await getDoc(doc(db, 'users', user.uid));
             window.currentUser = user;
@@ -147,8 +142,18 @@ onAuthStateChanged(auth, async (user) => {
                 profile.bonusMessages = 50;
                 setDoc(doc(db, 'users', user.uid), { bonusMessages: 50 }, { merge: true }).catch(e => console.warn("Failed to auto-gift points:", e));
             }
+
+            // Assign a unique 9-digit userId if user doesn't have one
+            if (profile && !profile.userId) {
+                const newUserId = String(Math.floor(100000000 + Math.random() * 900000000));
+                profile.userId = newUserId;
+                setDoc(doc(db, 'users', user.uid), { userId: newUserId }, { merge: true }).catch(e => console.warn("Failed to assign userId:", e));
+            }
             
             window.currentUserProfile = profile;
+            window.currentUserProfile.bonusMessages = Number(profile.bonusMessages) || 0;
+            window.currentUserProfile.isGuest = false;
+
             const displayName = profile.firstName ? `${profile.firstName} ${profile.lastName || ''}`.trim() : (user.displayName || user.email.split('@')[0]);
             document.getElementById('userNameDisplay').textContent = displayName;
 
@@ -160,12 +165,36 @@ onAuthStateChanged(auth, async (user) => {
         } catch (dbError) {
             console.warn("Could not fetch user profile from DB:", dbError);
             window.currentUser = user;
-            window.currentUserProfile = { email: user.email, isEmailVerified: true, bonusMessages: 50 };
+            window.currentUserProfile = { 
+                email: user.email, 
+                isEmailVerified: true, 
+                bonusMessages: 50,
+                isGuest: false
+            };
             document.getElementById('userNameDisplay').textContent = user.email.split('@')[0];
         }
 
         hideAuthModal();
         if (window.loadChatHistory) window.loadChatHistory();
+        if (window.updateQuotaDisplay) window.updateQuotaDisplay();
+    } else if (isGuest) {
+        window.currentUser = { uid: 'guest_user', displayName: 'ضيف', isGuest: true };
+        const guestBonus = Number(localStorage.getItem('tm-guest-bonus')) || 100;
+        window.currentUserProfile = { firstName: 'ضيف', lastName: '', bonusMessages: guestBonus, isGuest: true };
+        document.getElementById('userNameDisplay').textContent = 'ضيف (Guest)';
+        
+        // Change logout to login in sidebar for guests
+        const logoutBtn = document.getElementById('sidebarLogoutBtn');
+        if (logoutBtn) {
+            logoutBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> <span data-i18n="login">تسجيل الدخول</span>';
+            logoutBtn.onclick = () => { window.showAuthModal(); return false; };
+        }
+        
+        // Show guest prompt in sidebar
+        const guestPrompt = document.getElementById('guestSidebarPrompt');
+        if (guestPrompt) guestPrompt.style.display = 'block';
+
+        hideAuthModal();
         if (window.updateQuotaDisplay) window.updateQuotaDisplay();
     } else {
         window.currentUser = null;
@@ -176,32 +205,18 @@ onAuthStateChanged(auth, async (user) => {
 
 async function loginWithGoogle() {
     const provider = new GoogleAuthProvider();
-    provider.addScope('https://www.googleapis.com/auth/user.birthday.read');
+    // Simplified to avoid common People API / Scope permission issues
     
     try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
-        const snap = await getDoc(doc(db, 'users', user.uid));
+        const userRef = doc(db, 'users', user.uid);
+        const snap = await getDoc(userRef);
         
         if (!snap.exists()) {
-            let userAge = 18; 
-            try {
-                const credential = GoogleAuthProvider.credentialFromResult(result);
-                if (credential && credential.accessToken) {
-                    const res = await fetch('https://people.googleapis.com/v1/people/me?personFields=birthdays', {
-                        headers: { Authorization: `Bearer ${credential.accessToken}` }
-                    });
-                    const data = await res.json();
-                    if (data.birthdays && data.birthdays.length > 0) {
-                        const bDate = data.birthdays[0].date;
-                        if (bDate && bDate.year) userAge = new Date().getFullYear() - bDate.year;
-                    }
-                }
-            } catch (err) { console.warn('تعذر جلب العمر من جوجل:', err); }
-
             const nameParts = (user.displayName || '').split(' ');
-            const firstName = nameParts[0] || 'مستخدم';
-            const lastName = nameParts.slice(1).join(' ') || 'جوجل';
+            const firstName = nameParts[0] || 'User';
+            const lastName = nameParts.slice(1).join(' ') || '';
 
             const profileData = {
                 uid: user.uid,
@@ -209,16 +224,17 @@ async function loginWithGoogle() {
                 firstName: firstName,
                 lastName: lastName,
                 displayName: user.displayName || user.email.split('@')[0],
-                age: userAge,
+                age: 18, 
                 photoURL: user.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(firstName)}`,
                 isEmailVerified: true,
                 bonusMessages: 50,
                 msgCount: 0,
+                userId: String(Math.floor(100000000 + Math.random() * 900000000)),
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             };
             
-            await setDoc(doc(db, 'users', user.uid), profileData, { merge: true });
+            await setDoc(userRef, profileData);
             window.currentUserProfile = profileData;
         } else {
             window.currentUserProfile = snap.data();
@@ -226,16 +242,28 @@ async function loginWithGoogle() {
         
         hideAuthModal();
         if (window.loadChatHistory) window.loadChatHistory();
+        window.showToast?.('تم تسجيل الدخول بجوجل بنجاح!', 'success');
+        
     } catch (error) {
-        console.error('Google Login Error:', error);
-        if (error.code === 'auth/popup-blocked') {
-            showToast('تم حظر النافذة المنبثقة من المتصفح. يرجى تعطيل مانع النوافذ.', 'error');
-        } else if (error.code !== 'auth/popup-closed-by-user') {
-            showToast(`فشل الدخول بـ Google: ${error.message}`, 'error');
-        }
+        console.error("Google Login Error:", error);
+        window.showToast?.('فشل تسجيل الدخول بجوجل. يرجى المحاولة لاحقاً.', 'error');
     }
+}
+
+function loginAsGuest() {
+    sessionStorage.setItem('tm-guest-mode', 'true');
+    window.currentUser = { uid: 'guest_user', displayName: 'ضيف', isGuest: true };
+    window.currentUserProfile = { firstName: 'ضيف', lastName: '', bonusMessages: 100, isGuest: true };
+    document.getElementById('userNameDisplay').textContent = 'ضيف (Guest)';
+    const sidebarAvatar = document.getElementById('sidebarAvatar');
+    if (sidebarAvatar) sidebarAvatar.src = 'https://api.dicebear.com/7.x/bottts/svg?seed=Guest';
+    hideAuthModal();
+    if (window.updateQuotaDisplay) window.updateQuotaDisplay();
+    // Guests don't have cloud history, but can start a new chat
+    if (window.loadChatHistory) window.loadChatHistory(); 
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('googleLoginBtn')?.addEventListener('click', loginWithGoogle);
+    document.getElementById('guestLoginBtn')?.addEventListener('click', loginAsGuest);
 });

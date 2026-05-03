@@ -6,6 +6,24 @@ function toggleSidebar() {
     overlay.style.display = sidebar.classList.contains('active') ? 'block' : 'none';
 }
 
+window.openLightbox = (url) => {
+    const lBox = document.getElementById('imageLightbox');
+    const lImg = document.getElementById('lightboxImg');
+    if (lBox && lImg) {
+        lImg.src = url;
+        lBox.style.display = 'flex';
+        setTimeout(() => lBox.classList.add('active'), 10);
+    }
+};
+
+window.closeLightbox = () => {
+    const lBox = document.getElementById('imageLightbox');
+    if (lBox) {
+        lBox.classList.remove('active');
+        setTimeout(() => lBox.style.display = 'none', 300);
+    }
+};
+
 window.closeSidebarIfMobile = () => {
     if (window.innerWidth <= 768) {
         const sidebar = document.getElementById('sidebar');
@@ -62,13 +80,33 @@ window.closeModals = () => {
 };
 
 window.updateQuotaDisplay = () => {
-    if (!window.currentUserProfile) return;
-    const remaining = window.currentUserProfile.bonusMessages || 0;
     const countEl = document.getElementById('quotaCount');
-    if (countEl) countEl.textContent = remaining;
     const fillEl = document.getElementById('quotaProgressFill');
+    const labelEl = document.getElementById('quotaLabel');
+    if (!countEl) return;
+
+    const userMsgs = document.querySelectorAll('#messagesWrapper .message.user').length;
+    let remaining = 0;
+    let max = 50;
+    let label = "نقطة";
+
+    // If there are messages in the wrapper OR a chat is active, show the 100-msg countdown
+    if (userMsgs > 0 || window.currentChatId) {
+        remaining = Math.max(0, 100 - userMsgs);
+        max = 100;
+        label = "رسالة";
+    } else {
+        // Show daily points if no chat is started
+        remaining = (window.currentUserProfile?.bonusMessages) || 0;
+        max = (window.currentUserProfile?.isGuest) ? 100 : 50;
+        label = (window.currentUserProfile?.isGuest) ? "رسالة" : "نقطة";
+    }
+
+    countEl.textContent = remaining;
+    if (labelEl) labelEl.textContent = label;
+
     if (fillEl) {
-        const p = Math.min(100, Math.max(0, (remaining / 50) * 100)); // Updated to 50 max points
+        const p = Math.min(100, Math.max(0, (remaining / max) * 100));
         fillEl.style.width = p + '%';
         fillEl.style.background = p < 20 ? '#ef4444' : '#10b981';
     }
@@ -77,7 +115,13 @@ window.updateQuotaDisplay = () => {
 
 // Remove updateBackgroundsUI and applyBackground// نظام إدارة تاريخ الدردشة
 window.loadChatHistory = async () => {
-    if (!window.currentUser || !window.firebaseDb || !window.fsCore) return;
+    if (!window.currentUser) return;
+    if (window.currentUser.isGuest) {
+        const historyContainer = document.getElementById('historyList');
+        if (historyContainer) historyContainer.innerHTML = '<div style="text-align:center; padding:15px; font-size:0.8rem; opacity:0.5;">وضع الضيف (سجل مؤقت)</div>';
+        return;
+    }
+    if (!window.firebaseDb || !window.fsCore) return;
     const historyContainer = document.getElementById('historyList');
     const pinnedContainer = document.getElementById('pinnedChatsList');
     const archivedContainer = document.getElementById('archivedChatsList');
@@ -410,7 +454,9 @@ window.exportChatFromMenu = (chatId, type) => {
 };
 
 window.saveMessageToCurrentChat = async (content, sender, isHtml = false) => {
-    if (!window.firebaseDb || !window.currentUser || !content || !window.fsCore) return;
+    if (!window.currentUser || !content) return;
+    if (window.currentUser.isGuest) return; // Guests don't save to cloud
+    if (!window.firebaseDb || !window.fsCore) return;
     try {
         const { collection, addDoc, doc, updateDoc, serverTimestamp } = window.fsCore;
 
@@ -485,10 +531,11 @@ function initUI() {
     const openArchivesBtn = document.getElementById('openArchivesBtn');
     if (openArchivesBtn) {
         openArchivesBtn.onclick = () => {
+            window.closeModals();
             const archiveModal = document.getElementById('archiveModal');
             if (archiveModal) {
-                archiveModal.classList.add('active');
                 archiveModal.style.display = 'flex';
+                setTimeout(() => archiveModal.classList.add('active'), 10);
             }
             window.loadChatHistory();
             window.closeSidebarIfMobile();
@@ -498,10 +545,11 @@ function initUI() {
     const openSavedImagesBtn = document.getElementById('openSavedImagesBtn');
     if (openSavedImagesBtn) {
         openSavedImagesBtn.onclick = () => {
+            window.closeModals();
             const modal = document.getElementById('savedImagesModal');
             if (modal) {
-                modal.classList.add('active');
                 modal.style.display = 'flex';
+                setTimeout(() => modal.classList.add('active'), 10);
                 window.loadSavedImages?.();
             }
             window.closeSidebarIfMobile();
@@ -511,7 +559,7 @@ function initUI() {
     document.getElementById('closeSavedImagesBtn')?.addEventListener('click', window.closeModals);
     document.getElementById('closeArchiveBtn')?.addEventListener('click', window.closeModals);
 
-    initFloatingWelcome();
+
     initSavedImagesLogic();
     initWebsiteBuilderLogic();
     // تحميل المحادثات عند البداية
@@ -533,9 +581,7 @@ function initWebsiteBuilderLogic() {
     let currentMode = 'create';
 
     openBtn.onclick = () => {
-        modal.style.display = 'flex';
-        modal.classList.add('active');
-        window.closeSidebarIfMobile();
+        window.showFutureUpdate?.();
     };
 
     closeBtn.onclick = () => {
@@ -643,31 +689,6 @@ function initWebsiteBuilderLogic() {
     }
 }
 
-function initFloatingWelcome() {
-    const snack = document.getElementById('floatingWelcome');
-    if (!snack) return;
-
-    if (localStorage.getItem('tm-welcome-seen-v1')) return;
-
-    setTimeout(() => {
-        snack.style.display = 'flex';
-    }, 2500);
-
-    document.getElementById('discoverFeaturesBtn').onclick = () => {
-        snack.style.display = 'none';
-        localStorage.setItem('tm-welcome-seen-v1', 'true');
-
-        // Open settings and go to features tab
-        window.showSettings();
-        const featBtn = document.querySelector('.snav-btn[data-tab="notifications"]');
-        if (featBtn) featBtn.click();
-    };
-
-    document.getElementById('closeFloatingBtn').onclick = () => {
-        snack.style.display = 'none';
-        localStorage.setItem('tm-welcome-seen-v1', 'true');
-    };
-}
 
 function initSavedImagesLogic() {
     window.loadSavedImages = () => {
@@ -682,7 +703,7 @@ function initSavedImagesLogic() {
 
         grid.innerHTML = images.map((img, idx) => `
             <div class="saved-image-item">
-                <img src="${img.url}" loading="lazy">
+                <img src="${img.url}" loading="lazy" onclick="window.openLightbox('${img.url}')" style="cursor:zoom-in;">
                 <div class="saved-image-actions">
                     <button class="img-action-btn-small" onclick="window.downloadSavedImage('${img.url}')"><i class="fa-solid fa-download"></i></button>
                     <button class="img-action-btn-small" style="background:#e74c3c" onclick="window.deleteSavedImage(${idx})"><i class="fa-solid fa-trash"></i></button>

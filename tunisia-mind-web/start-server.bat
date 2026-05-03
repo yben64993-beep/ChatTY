@@ -1,6 +1,6 @@
 @echo off
 echo ==============================================
-echo 🚀 Starting Tunisia Mind Server 🚀
+echo 🚀 Starting MindTY Server 🚀
 echo ==============================================
 cd /d "%~dp0\tunisia-mind-web" 2>nul || cd /d "%~dp0"
 echo 📦 Installing dependencies if needed...

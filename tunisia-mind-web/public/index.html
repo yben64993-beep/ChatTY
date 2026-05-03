@@ -13,11 +13,11 @@
         }
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tunisia Mind AI - Chat AI Tunisia</title>
-    <meta name="description" content="Tunisia Mind AI موقع ذكاء اصطناعي للدردشة وطرح الأسئلة ومساعدة المستخدمين في تونس والعالم.">
-    <meta name="keywords" content="Tunisia AI, Tunisia Mind AI, ذكاء اصطناعي تونس, AI chat Tunisia">
-    <meta name="author" content="Tunisia Mind AI">
-    <meta property="og:title" content="Tunisia Mind AI">
+    <title>MindTY AI - Chat AI Tunisia</title>
+    <meta name="description" content="MindTY AI موقع ذكاء اصطناعي للدردشة وطرح الأسئلة ومساعدة المستخدمين في تونس والعالم.">
+    <meta name="keywords" content="Tunisia AI, MindTY AI, ذكاء اصطناعي تونس, AI chat Tunisia">
+    <meta name="author" content="MindTY AI">
+    <meta property="og:title" content="MindTY AI">
     <meta property="og:description" content="موقع ذكاء اصطناعي للدردشة والإجابة عن الأسئلة">
     <meta property="og:type" content="website">
     <link rel="icon" href="assets/tunisia-brain-new.jpg">
@@ -32,8 +32,6 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
-    <script src="https://js.puter.com/v2/"></script>
-    
     <!-- KaTeX for Math support -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
@@ -47,6 +45,9 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
+    <!-- Libraries for Advanced File Analysis -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 
 <body class="dark-theme">
@@ -95,10 +96,19 @@
                     <i class="fa-solid fa-image"></i>
                     <span data-i18n="saved_images">الصور المحفوظة</span>
                 </button>
-                <button class="new-chat-btn" id="openWebsiteBuilderBtn" style="background:linear-gradient(135deg, #10b981, #0ea5e9); color:white; border:none; margin-top:8px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <button class="new-chat-btn" id="openWebsiteBuilderBtn" style="background:linear-gradient(135deg, #4b5563, #374151); color:rgba(255,255,255,0.6); border:none; margin-top:8px; box-shadow: none; cursor:not-allowed;" onclick="window.showFutureUpdate()">
+                    <i class="fa-solid fa-lock"></i>
                     <span data-i18n="ai_websites">مواقع بالذكاء الاصطناعي</span>
                 </button>
+
+                <!-- Guest Prompt -->
+                <div id="guestSidebarPrompt" style="display:none; margin-top:15px; padding:12px; background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.2); border-radius:10px; text-align:center;">
+                    <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:10px;">قم بتسجيل الدخول بحساب جوجل لحفظ محادثاتك والوصول إليها من أي مكان!</p>
+                    <button class="btn-primary" style="font-size:0.8rem; padding:8px 15px;" onclick="window.showAuthModal()">
+                        <i class="fa-brands fa-google"></i> تسجيل الدخول
+                    </button>
+                </div>
+
             </div>
 
             <!-- Pinned chats section -->
@@ -149,7 +159,7 @@
                             onerror="this.style.display='none'">
                         <span class="logo-emoji" id="logoEmoji" style="font-size: 1.5rem; display: none;">🧠</span>
                     </div>
-                    <span class="brand-name" id="currentChatTitle" data-i18n="brand_name">العقل التونسي</span>
+                    <span class="brand-name" id="currentChatTitle" data-i18n="brand_name">MindTY</span>
                     <span class="badge-beta">Beta</span>
                 </div>
                 
@@ -213,17 +223,20 @@
                             <i class="fa-solid fa-paperclip"></i>
                         </button>
                         <div id="attachMenu" class="attach-menu-centered">
-                            <div class="context-menu-item" onclick="document.getElementById('fileInputAlpha').click(); this.parentElement.classList.remove('active');">
-                                <i class="fa-solid fa-file-code" style="color:var(--accent-color);"></i>
+                            <div class="context-menu-item" onclick="window.showFutureUpdate(); this.parentElement.classList.remove('active');">
+                                <i class="fa-solid fa-file-code" style="color:#6b7280;"></i>
                                 <span data-i18n="upload_file">رفع ملف نصي / كود</span>
+                                <i class="fa-solid fa-lock" style="font-size:0.7rem; margin-right:auto; opacity:0.5;"></i>
                             </div>
-                            <div class="context-menu-item" onclick="document.getElementById('imageInput').click(); this.parentElement.classList.remove('active');">
-                                <i class="fa-solid fa-image" style="color:#10b981;"></i>
+                            <div class="context-menu-item" onclick="window.showFutureUpdate(); this.parentElement.classList.remove('active');">
+                                <i class="fa-solid fa-image" style="color:#6b7280;"></i>
                                 <span data-i18n="upload_image">رفع صورة للتحليل</span>
+                                <i class="fa-solid fa-lock" style="font-size:0.7rem; margin-right:auto; opacity:0.5;"></i>
                             </div>
-                            <div class="context-menu-item" onclick="document.getElementById('videoInput').click(); this.parentElement.classList.remove('active');">
-                                <i class="fa-solid fa-video" style="color:#ef4444;"></i>
+                            <div class="context-menu-item" onclick="window.showFutureUpdate(); this.parentElement.classList.remove('active');">
+                                <i class="fa-solid fa-video" style="color:#6b7280;"></i>
                                 <span data-i18n="upload_video">تحليل فيديو (20ث)</span>
+                                <i class="fa-solid fa-lock" style="font-size:0.7rem; margin-right:auto; opacity:0.5;"></i>
                             </div>
                         </div>
                     </div>
@@ -256,7 +269,7 @@
     <!-- Auth Modal -->
     <div id="authModal" class="modal-overlay" style="display:none;">
         <div class="auth-card" id="authCard">
-            <div class="auth-logo">🧠 <span data-i18n="brand_name">العقل التونسي</span></div>
+            <div class="auth-logo">🧠 <span data-i18n="brand_name">MindTY</span></div>
 
             <div id="loginForm">
                 <h2 data-i18n="login">تسجيل الدخول / إنشاء حساب</h2>
@@ -265,6 +278,15 @@
                     <button class="btn-google" id="googleLoginBtn">
                         <i class="fa-brands fa-google"></i> 
                         <span data-i18n="google_login">المتابعة باستخدام Google</span>
+                    </button>
+                    <div class="auth-divider" style="margin: 1.5rem 0; color: var(--text-muted); display: flex; align-items: center; gap: 10px;">
+                        <div style="flex:1; height:1px; background:var(--border-color);"></div>
+                        <span style="font-size: 0.85rem;">أو</span>
+                        <div style="flex:1; height:1px; background:var(--border-color);"></div>
+                    </div>
+                    <button class="btn-secondary" id="guestLoginBtn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); width: 100%; padding: 0.75rem; border-radius: 0.65rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;">
+                        <i class="fa-solid fa-user-ninja"></i> 
+                        <span data-i18n="guest_login">الدخول كضيف (بدون حساب)</span>
                     </button>
                 </div>
             </div>
@@ -289,8 +311,7 @@
                             data-i18n="appearance">المظهر</span></button>
                     <button class="snav-btn" data-tab="tab-social"><i class="fa-solid fa-share-nodes"></i> <span
                             data-i18n="social_media">تواصل اجتماعي</span></button>
-                    <button class="snav-btn" data-tab="tab-notifications"><i class="fa-solid fa-bell"></i> <span
-                            data-i18n="notifications">الإشعارات</span></button>
+
                     <button class="snav-btn" data-tab="tab-language"><i class="fa-solid fa-globe"></i> <span
                             data-i18n="language">اللغة</span></button>
                     <button class="snav-btn" data-tab="tab-support"><i class="fa-solid fa-headset"></i> <span
@@ -312,6 +333,49 @@
                                 id="profileAge" class="form-input" min="8" max="120"></div>
                         <div class="form-group"><label data-i18n="email_lbl">البريد الإلكتروني</label><input
                                 type="email" id="profileEmail" class="form-input" readonly style="opacity:0.6;"></div>
+
+                        <!-- User ID Display -->
+                        <div class="form-group" id="userIdGroup" style="display:none;">
+                            <label style="display:flex; align-items:center; gap:8px;">
+                                <i class="fa-solid fa-id-badge" style="color:var(--accent-color);"></i>
+                                <span data-i18n="your_id">معرّفك</span>
+                            </label>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <div id="userIdDisplay" style="
+                                    flex:1;
+                                    font-family: 'Courier New', monospace;
+                                    font-size: 1.3rem;
+                                    font-weight: 700;
+                                    letter-spacing: 3px;
+                                    text-align: center;
+                                    padding: 12px 16px;
+                                    background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(14,165,233,0.12));
+                                    border: 1.5px solid var(--accent-color);
+                                    border-radius: 10px;
+                                    color: var(--accent-color);
+                                    user-select: all;
+                                    cursor: text;
+                                ">---------</div>
+                                <button id="copyUserIdBtn" title="نسخ المعرّف" style="
+                                    background: var(--accent-color);
+                                    color: white;
+                                    border: none;
+                                    border-radius: 10px;
+                                    padding: 12px 14px;
+                                    cursor: pointer;
+                                    font-size: 1rem;
+                                    transition: opacity 0.2s;
+                                    flex-shrink:0;
+                                " onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                                    <i class="fa-solid fa-copy"></i>
+                                </button>
+                            </div>
+                            <p style="font-size:0.78rem; color:var(--text-muted); margin-top:5px; margin-bottom:0;">
+                                <i class="fa-solid fa-circle-info"></i>
+                                <span data-i18n="id_note"> هذا معرّفك الفريد، يُستخدم عند التواصل مع الدعم.</span>
+                            </p>
+                        </div>
+
                         <button class="btn-primary" id="saveProfileBtn" data-i18n="save_changes">حفظ التغييرات</button>
                     </div>
 
@@ -375,38 +439,7 @@
                         </div>
                     </div>
 
-                    <!-- Notifications Tab -->
-                    <div id="tab-notifications" class="stab" style="display:none;">
-                        <h3 data-i18n="notifications">مميزات العقل التونسي 🚀</h3>
-                        
-                        <div class="features-list-scroll" id="notificationsList" style="margin-bottom: 20px;">
-                            <div class="feature-card-mini notification-item" id="notif-1" style="background:var(--bg-tertiary); padding:15px; border-radius:12px; margin-bottom:10px; border-right:4px solid var(--accent-color); position:relative;">
-                                <button onclick="this.parentElement.style.display='none'; localStorage.setItem('tm-notif-1', 'read');" style="position:absolute; left:10px; top:10px; background:none; border:none; color:var(--text-secondary); cursor:pointer;"><i class="fa-solid fa-check"></i></button>
-                                <strong style="display:block; margin-bottom:5px; color:var(--accent-color);">🌟 تحديث جديد قادم!</strong>
-                                <p style="font-size:0.85rem; color:var(--text-secondary);">ترقبوا ميزات صناعة الصور الاحترافية المدمجة وتحليل مقاطع الفيديو في التحديث القادم.</p>
-                            </div>
-                            <div class="feature-card-mini" style="background:var(--bg-tertiary); padding:15px; border-radius:12px; margin-bottom:10px; border-right:4px solid #10b981;">
-                                <strong style="display:block; margin-bottom:5px; color:#10b981;">🎨 توليد صور احترافية</strong>
-                                <p style="font-size:0.85rem; color:var(--text-secondary);">اطلب منه "ارسم..." وسيقوم بإنشاء صور فنية ومدهشة فوراً.</p>
-                            </div>
-                        </div>
-                        <script>
-                            if(localStorage.getItem('tm-notif-1') === 'read') {
-                                document.getElementById('notif-1').style.display = 'none';
-                            }
-                        </script>
 
-                        <div class="toggle-item">
-                            <div>
-                                <strong data-i18n="sys_notif">إشعارات النظام</strong>
-                                <p data-i18n="sys_notif_desc">تحديثات وإشعارات النظام</p>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="systemNotifToggle" checked>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
 
                     <!-- Social Media Tab -->
                     <div id="tab-social" class="stab" style="display:none;">
@@ -420,7 +453,7 @@
                                 style="display: flex; align-items: center; gap: 1rem; padding: 1.25rem; background: rgba(255, 0, 0, 0.1); border: 1px solid rgba(255, 0, 0, 0.2); border-radius: 1rem; text-decoration: none; color: inherit; transition: transform 0.2s, box-shadow 0.2s;">
                                 <i class="fab fa-youtube" style="font-size: 2.2rem; color: #ff0000;"></i>
                                 <div class="social-info">
-                                    <strong style="display: block; font-size: 1.1rem;">Tunisia Mind AI</strong>
+                                    <strong style="display: block; font-size: 1.1rem;">MindTY AI</strong>
                                     <span style="font-size: 0.82rem; opacity: 0.8;" data-i18n="youtube_sub_text">اشترك
                                         في قناتنا على اليوتيوب</span>
                                 </div>
@@ -432,7 +465,7 @@
                                 style="display: flex; align-items: center; gap: 1rem; padding: 1.25rem; background: rgba(0, 242, 254, 0.1); border: 1px solid rgba(254, 44, 85, 0.2); border-radius: 1rem; text-decoration: none; color: inherit; transition: transform 0.2s, box-shadow 0.2s;">
                                 <i class="fab fa-tiktok" style="font-size: 2.2rem; color: var(--text-primary);"></i>
                                 <div class="social-info">
-                                    <strong style="display: block; font-size: 1.1rem;">Tunisia Mind AI</strong>
+                                    <strong style="display: block; font-size: 1.1rem;">MindTY AI</strong>
                                     <span style="font-size: 0.82rem; opacity: 0.8;" data-i18n="tiktok_sub_text">تابعنا
                                         على حسابنا في التيك توك</span>
                                 </div>
@@ -447,6 +480,15 @@
                         <div class="language-grid">
                             <button class="lang-btn active" data-lang="ar" data-dir="rtl">🇹🇳 العربية</button>
                             <button class="lang-btn" data-lang="en" data-dir="ltr">🇬🇧 English</button>
+                            <button class="lang-btn" data-lang="fr" data-dir="ltr">🇫🇷 Français</button>
+                            <button class="lang-btn" data-lang="es" data-dir="ltr">🇪🇸 Español</button>
+                            <button class="lang-btn" data-lang="de" data-dir="ltr">🇩🇪 Deutsch</button>
+                            <button class="lang-btn" data-lang="it" data-dir="ltr">🇮🇹 Italiano</button>
+                            <button class="lang-btn" data-lang="pt" data-dir="ltr">🇵🇹 Português</button>
+                            <button class="lang-btn" data-lang="ru" data-dir="ltr">🇷🇺 Русский</button>
+                            <button class="lang-btn" data-lang="zh" data-dir="ltr">🇨🇳 中文</button>
+                            <button class="lang-btn" data-lang="ja" data-dir="ltr">🇯🇵 日本語</button>
+                            <button class="lang-btn" data-lang="tr" data-dir="ltr">🇹🇷 Türkçe</button>
                         </div>
                     </div>
 
@@ -585,18 +627,7 @@
         </div>
     </div>
 
-    <!-- Floating Welcome Message -->
-    <div id="floatingWelcome" class="floating-welcome-snack" style="display:none;">
-        <div class="snack-content">
-            <span data-i18n="welcome_discover">مرحباً! انقر لرؤية مميزات الموقع الجديدة 🚀</span>
-        </div>
-        <button id="discoverFeaturesBtn" class="snack-btn">اكتشف</button>
-        <button id="closeFloatingBtn" class="snack-close"><i class="fa-solid fa-xmark"></i></button>
-    </div>
 
-
-    <!-- Toast notification -->
-    <div id="toast" class="toast"></div>
 
     <!-- ===== LOGOUT MODAL ===== -->
     <div id="logoutModal" class="modal-overlay">
@@ -610,8 +641,6 @@
     </div>
 
     <!-- Scripts -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs/loader.min.js"></script>
     <script src="js/translations.js?v=2.0.1" defer></script>
     <script src="js/language.js?v=2.0.1" defer></script>
     <script type="module" src="js/auth.js?v=2.0.1" defer></script>
@@ -620,6 +649,25 @@
     <script src="js/ui.js?v=2.0.1" defer></script>
     <script src="js/settings.js?v=2.0.1" defer></script>
     <script src="js/app.js?v=2.0.1" defer></script>
+    <script>
+        // Basic global utilities available immediately
+        window.showToast = (msg, type = 'info') => {
+            const t = document.getElementById('toast');
+            if (!t) return;
+            t.textContent = msg;
+            t.className = `toast show ${type}`;
+            setTimeout(() => t.className = 'toast', 3000);
+        };
+        window.showFutureUpdate = () => {
+            const lang = localStorage.getItem('mindtyLang') || 'ar';
+            const trans = {
+                ar: "سيتم تفعيله في التحديثات القادمة",
+                en: "Will be available in future updates",
+                fr: "Sera disponible dans les prochaines mises à jour"
+            };
+            window.showToast(trans[lang] || trans['ar'], 'info');
+        };
+    </script>
 </body>
 
 </html>

@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             const banner = document.getElementById('referralBanner');
                             if (banner) {
                                 banner.style.display = 'block';
-                                banner.innerHTML = `🌟 أنت تقبل دعوة صديقك <b>${inviterName}</b> للانضمام إلى العقل التونسي!`;
+                                banner.innerHTML = `🌟 أنت تقبل دعوة صديقك <b>${inviterName}</b> للانضمام إلى MindTY!`;
                             }
                         }
                     }

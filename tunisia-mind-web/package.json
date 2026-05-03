@@ -1,7 +1,7 @@
 {
   "name": "tunisia-mind-web",
   "version": "1.0.0",
-  "description": "Tunisia Mind Web App",
+  "description": "MindTY Web App",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
