@@ -136,13 +136,17 @@ window.showAuthModal = showAuthModal;
 window.hideAuthModal = hideAuthModal;
 
 // Handle Redirect Result (for mobile/blocked popups)
-getRedirectResult(auth).catch(e => {
-    // في حال فشل التحويل، نظهر رسالة للمستخدم
-    window.showToast?.('فشل استكمال الدخول، يرجى المحاولة مرة أخرى', 'error');
-    // Clear any stuck loading state
-    if (window.hideAuthModal) window.hideAuthModal();
+getRedirectResult(auth).then((result) => {
+    if (result?.user) hideAuthModal();
+}).catch(e => {
+    console.error("Firebase Redirect Error:", e);
     if (e.code && e.code !== 'auth/popup-closed-by-user') {
-        console.error("Redirect Result Error:", e);
+        // إذا كان الخطأ متعلق بالنطاق، سنظهره بوضوح
+        if (e.code === 'auth/unauthorized-domain') {
+            alert("خطأ Firebase: هذا النطاق (Domain) غير مضاف في Authorized Domains في Firebase Console.");
+        } else {
+            window.showToast?.("خطأ في تسجيل الدخول: " + e.code, "error");
+        }
     }
 });
 
@@ -263,29 +267,28 @@ async function loginWithGoogle() {
         } else {
             window.currentUserProfile = snap.data();
         }
-
         hideAuthModal();
         if (window.loadChatHistory) window.loadChatHistory();
         window.showToast?.('تم تسجيل الدخول بجوجل بنجاح!', 'success');
-
     } catch (error) {
-        if (error.code === 'auth/popup-blocked' || (error.message || '').includes('cross-origin') || (error.message || '').includes('cookies')) {
+        console.error("Google Auth Error Details:", error);
+        
+        // إذا كان النطاق غير مسموح به، نتوقف هنا ولا نعيد تحميل الصفحة
+        if (error.code === 'auth/unauthorized-domain') {
+            alert("خطأ Firebase: يرجى إضافة هذا الرابط في Firebase Console > Authentication > Settings > Authorized Domains");
+            return;
+        }
+
+        if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
             window.showToast?.('جاري محاولة تسجيل الدخول عبر التحويل...', 'info');
-            try {
-                await signInWithRedirect(auth, provider);
-            } catch (err2) {
-                console.error("Redirect Login Error:", err2);
-                window.showToast?.('فشل تسجيل الدخول. يرجى التأكد من إعدادات المتصفح.', 'error');
-            }
-        } else if (error.code !== 'auth/popup-closed-by-user') {
-            // في حال إغلاق النافذة تلقائياً أو حدوث خطأ غير معروف، نستخدم التحويل كبديل آمن
-            console.warn("Popup failed, trying redirect...");
-            signInWithRedirect(auth, provider).catch(e => console.error(e));
+            await signInWithRedirect(auth, provider);
+        } else if (error.code === 'auth/popup-closed-by-user') {
+            // لا تفعل شيئاً إذا أغلق المستخدم النافذة بنفسه
+            return;
         } else {
-            if (window.innerWidth <= 768) {
-                window.showToast?.('جاري محاولة تسجيل الدخول...', 'info');
-                signInWithRedirect(auth, provider).catch(e => console.error(e));
-            }
+            // لأي خطأ آخر، نحاول التحويل بعد تنبيه المستخدم
+            window.showToast?.("خطأ: " + error.code, "error");
+            setTimeout(() => signInWithRedirect(auth, provider), 1500);
         }
     }
 }

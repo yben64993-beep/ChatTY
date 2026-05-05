@@ -48,15 +48,16 @@ app.use('/api/', limiter);
 app.use(cors());
 app.use(bodyParser.json({ limit: '100mb' }));
 
-// الإعدادات الجديدة لضمان عدم تخزين النسخ القديمة
-app.use(express.static(path.join(__dirname, 'public'), {
-    setHeaders: (res, path) => {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        res.setHeader('Surrogate-Control', 'no-store');
-    }
-}));
+// مِيدل وير لفرض منع التخزين المؤقت على جميع الطلبات قبل إرسال الملفات
+app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '-1');
+    res.setHeader('Surrogate-Control', 'no-store');
+    next();
+});
+
+app.use(express.static(path.join(__dirname, 'public'), { etag: false, lastModified: false }));
 
 const SYSTEM_PROMPT = `
 أنت مساعد ذكاء اصطناعي متقدم اسمه "MindTY". أنت مساعد ذكي، ودود، ومفيد جداً.
