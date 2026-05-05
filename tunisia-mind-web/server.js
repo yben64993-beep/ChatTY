@@ -13,7 +13,6 @@ const { searchKnowledgeBase } = require('./knowledge');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 require('dotenv').config({ path: path.join(__dirname, '.env') });
-// Removed node-fetch import because native fetch is fully supported and `const fetch = ...` triggers TS/lint red arrows.// ==========================================
 // حماية الخادم من التوقف المفاجئ (Anti-Crash)
 // ==========================================
 process.on('uncaughtException', (err) => {
@@ -30,8 +29,6 @@ const CUSTOM_AI_API_URL = process.env.CUSTOM_AI_API_URL || 'https://attached-ass
 if (!CUSTOM_AI_API_KEY) {
     console.error("⚠️ خطأ: لم يتم العثور على CUSTOM_AI_API_KEY!");
 }
-const verificationCodes = new Map();
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -50,7 +47,16 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 app.use(cors());
 app.use(bodyParser.json({ limit: '100mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+
+// الإعدادات الجديدة لضمان عدم تخزين النسخ القديمة
+app.use(express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res, path) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('Surrogate-Control', 'no-store');
+    }
+}));
 
 const SYSTEM_PROMPT = `
 أنت مساعد ذكاء اصطناعي متقدم اسمه "MindTY". أنت مساعد ذكي، ودود، ومفيد جداً.
@@ -218,7 +224,7 @@ async function generateAIResponse(messages, depth = 0) {
         const now = Date.now();
         if (!global.lastAIPing || now - global.lastAIPing > 300000) { // Ping every 5 mins
             global.lastAIPing = now;
-            fetch(CUSTOM_AI_API_URL + '/', { signal: AbortSignal.timeout(2000) }).catch(() => {});
+            fetch(CUSTOM_AI_API_URL + '/', { signal: AbortSignal.timeout(2000) }).catch(() => { });
         }
 
         let lastMessageContent = messages[messages.length - 1].content;
@@ -250,10 +256,10 @@ async function generateAIResponse(messages, depth = 0) {
         const data = await response.json();
         const messageContent = data.response;
         if (!messageContent) return "لا توجد استجابة.";
-        
+
         // Custom API doesn't support tool calls natively yet
         /* if (message.tool_calls) { ... } */
-        
+
         return messageContent;
 
     } catch (error) { return "⚠️ خطأ في الاتصال بالذكاء الاصطناعي."; }
@@ -267,18 +273,18 @@ async function streamAIResponse(messages, res, responseLen) {
         let response;
         let attempts = 0;
         const maxAttempts = 3;
-        
+
         // منع تسرب الذاكرة وإيقاف الاستدعاء إذا ألغى المستخدم الاتصال
         const controller = new AbortController();
         res.on('close', () => {
             controller.abort();
         });
-        
+
         // Step 1: Wake up the custom API server (in background)
         const now = Date.now();
         if (!global.lastAIPing || now - global.lastAIPing > 300000) {
             global.lastAIPing = now;
-            fetch(CUSTOM_AI_API_URL + '/', { signal: AbortSignal.timeout(2000) }).catch(() => {});
+            fetch(CUSTOM_AI_API_URL + '/', { signal: AbortSignal.timeout(2000) }).catch(() => { });
         }
 
         console.log(`📡 Sending stream request to: ${CUSTOM_AI_API_URL}/api/chat`);
@@ -296,15 +302,15 @@ async function streamAIResponse(messages, res, responseLen) {
                         'Authorization': `Bearer ${CUSTOM_AI_API_KEY}`
                     },
                     signal: AbortSignal.any([controller.signal, AbortSignal.timeout(60000)]),
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         user_id: "tunisia_mind_user",
                         message: lastMessageContent
                     })
                 });
                 console.log(`📥 API Stream Response Status: ${response.status}`);
-                
+
                 if (response.ok) break;
-                
+
                 // If busy or temporary error, wait and retry
                 if (response.status === 429 || response.status >= 500) {
                     attempts++;
@@ -312,7 +318,7 @@ async function streamAIResponse(messages, res, responseLen) {
                     await new Promise(r => setTimeout(r, 1000)); // Reduced from 2000
                     continue;
                 }
-                
+
                 break; // Other error, don't retry
             } catch (err) {
                 attempts++;
@@ -328,7 +334,7 @@ async function streamAIResponse(messages, res, responseLen) {
             let friendlyMsg = "⚠️ عذراً، المخدم مشغول حالياً أو أن المفتاح غير صالح. جارِ محاولة تحسين الخدمة...";
             if (status === 401) friendlyMsg = "⚠️ خطأ في المصادقة مع المخدم الجديد (API Key قد يكون غير صحيح).";
             if (status === 404) friendlyMsg = "⚠️ المسار المطلوب غير متاح على المخدم الجديد.";
-            
+
             res.write(`data: ${JSON.stringify({ content: friendlyMsg })}\n\n`);
             res.write('data: [DONE]\n\n');
             res.end();
@@ -339,7 +345,7 @@ async function streamAIResponse(messages, res, responseLen) {
         const data = await response.json();
         console.log("📦 Replit Response Data:", JSON.stringify(data));
         const content = data.response;
-        
+
         if (content) {
             console.log("📤 Sending content to frontend:", content.slice(0, 50) + "...");
             // Fake the stream by sending it all at once, or chunk it if desired. 
@@ -362,7 +368,7 @@ async function performWebSearch(query) {
     const searchUrl = `${baseUrl}/api/search`;
 
     // Wake up the search server
-    try { await fetch(baseUrl + '/', { signal: AbortSignal.timeout(3000) }); } catch (_) {}
+    try { await fetch(baseUrl + '/', { signal: AbortSignal.timeout(3000) }); } catch (_) { }
 
     try {
         const res = await fetch(searchUrl, {
@@ -415,11 +421,11 @@ async function performWebSearch(query) {
 
 app.post('/api/chat', async (req, res) => {
     const { prompt, userContext, history, stream, responseLen, image } = req.body;
-    
+
     // Auto-detect search intent
     const searchKeywords = ['ابحث', 'بحث', 'نتائج', 'اخبار', 'أخبار', 'search', 'find', 'news', 'internet', 'نت', 'انترنت', 'ما هو', 'من هو', 'اين', 'متى', 'how', 'who', 'where', 'when', 'what is'];
     const needsSearch = searchKeywords.some(k => prompt?.toLowerCase().includes(k));
-    
+
     if (needsSearch && !image) {
         console.log(`🔍 Routing to Search Retrieval System: ${prompt}`);
         const searchResult = await performWebSearch(prompt);
@@ -443,19 +449,19 @@ app.post('/api/chat', async (req, res) => {
         messages.push({ role: 'system', content: `The user's name is ${userContext.name}. Address them casually by their name in a friendly, natural manner. Do not repeat greeting rules.` });
     }
     if (history) messages = messages.concat(history);
-    
+
     if (image) {
         let contentAction = [];
         if (Array.isArray(image)) {
-            contentAction.push({ 
-                type: "text", 
-                text: prompt || "تحليل فيديو..." 
+            contentAction.push({
+                type: "text",
+                text: prompt || "تحليل فيديو..."
             });
             image.forEach(imgUrl => contentAction.push({ type: "image_url", image_url: { url: imgUrl } }));
         } else {
-            contentAction.push({ 
-                type: "text", 
-                text: prompt || "تحليل صورة..." 
+            contentAction.push({
+                type: "text",
+                text: prompt || "تحليل صورة..."
             });
             contentAction.push({ type: "image_url", image_url: { url: image } });
         }
@@ -485,7 +491,7 @@ async function translatePromptToEnglish(arabicText) {
             data[0].forEach(t => { if (t[0]) englishText += t[0]; });
         }
         return englishText || arabicText;
-    } catch(e) {
+    } catch (e) {
         console.error("Translation error:", e);
         return arabicText;
     }
@@ -495,16 +501,16 @@ app.post('/api/generate-image', async (req, res) => {
     let { prompt } = req.body;
     try {
         const englishPrompt = await translatePromptToEnglish(prompt);
-        
+
         const forgeUrl = process.env.IMAGE_FORGE_API_URL;
         const forgeKey = process.env.IMAGE_FORGE_API_KEY;
 
         if (!forgeUrl || !forgeKey) {
-             throw new Error("Image Forge API not configured.");
+            throw new Error("Image Forge API not configured.");
         }
 
         // Wake up the forge server
-        try { await fetch(forgeUrl + '/', { signal: AbortSignal.timeout(3000) }); } catch (_) {}
+        try { await fetch(forgeUrl + '/', { signal: AbortSignal.timeout(3000) }); } catch (_) { }
 
         const response = await fetch(`${forgeUrl}/api/v1/images`, {
             method: 'POST',
@@ -512,7 +518,7 @@ app.post('/api/generate-image', async (req, res) => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${forgeKey}`
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 prompt: englishPrompt,
                 response_format: 'base64',
                 aspect_ratio: '1:1'
