@@ -375,8 +375,8 @@ async function performWebSearch(query) {
     const baseUrl = 'https://intelligent-retrieval-system--yben64993.replit.app';
     const searchUrl = `${baseUrl}/api/search`;
 
-    // Wake up the search server
-    try { await fetch(baseUrl + '/', { signal: AbortSignal.timeout(3000) }); } catch (_) { }
+    // Wake up the search server (non-blocking)
+    fetch(baseUrl + '/', { signal: AbortSignal.timeout(3000) }).catch(() => { });
 
     try {
         const res = await fetch(searchUrl, {
@@ -430,8 +430,8 @@ async function performWebSearch(query) {
 app.post('/api/chat', async (req, res) => {
     const { prompt, userContext, history, stream, responseLen, image } = req.body;
 
-    // Auto-detect search intent
-    const searchKeywords = ['ابحث', 'بحث', 'نتائج', 'اخبار', 'أخبار', 'search', 'find', 'news', 'internet', 'نت', 'انترنت', 'ما هو', 'من هو', 'اين', 'متى', 'how', 'who', 'where', 'when', 'what is'];
+    // Auto-detect search intent (stricter keywords to prevent slow searches on normal questions)
+    const searchKeywords = ['ابحث', 'بحث', 'نتائج', 'اخبار', 'أخبار', 'search the web', 'search internet', 'اخر اخبار'];
     const needsSearch = searchKeywords.some(k => prompt?.toLowerCase().includes(k));
 
     if (needsSearch && !image) {
