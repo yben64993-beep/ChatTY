@@ -1,18 +1,8 @@
-const CACHE_NAME = 'tunisia-brain-v5';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/css/style.css',
-  '/js/chat.js',
-  '/js/api.js',
-  '/assets/tunisia-brain-new.jpg'
-];
+// sw.js - No Cache Version
+const CACHE_NAME = 'tunisia-brain-v6'; // Update version to clear old caches
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
-  );
 });
 
 self.addEventListener('activate', (event) => {
@@ -20,9 +10,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
+          return caches.delete(cacheName); // Delete ALL caches
         })
       );
     }).then(() => self.clients.claim())
@@ -30,7 +18,6 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
-  );
+  // Always fetch from network, never use cache
+  event.respondWith(fetch(event.request));
 });
