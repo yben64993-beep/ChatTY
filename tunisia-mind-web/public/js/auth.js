@@ -214,8 +214,6 @@ onAuthStateChanged(auth, async (user) => {
 
 async function loginWithGoogle() {
     const provider = new GoogleAuthProvider();
-    provider.addScope('https://www.googleapis.com/auth/user.birthday.read');
-    
     try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
@@ -224,19 +222,6 @@ async function loginWithGoogle() {
         
         if (!snap.exists()) {
             let userAge = 18; 
-            try {
-                const credential = GoogleAuthProvider.credentialFromResult(result);
-                if (credential && credential.accessToken) {
-                    const res = await fetch('https://people.googleapis.com/v1/people/me?personFields=birthdays', {
-                        headers: { Authorization: `Bearer ${credential.accessToken}` }
-                    });
-                    const data = await res.json();
-                    if (data.birthdays && data.birthdays.length > 0) {
-                        const bDate = data.birthdays[0].date;
-                        if (bDate && bDate.year) userAge = new Date().getFullYear() - bDate.year;
-                    }
-                }
-            } catch (err) { console.warn('تعذر جلب العمر من جوجل:', err); }
 
             const nameParts = (user.displayName || '').split(' ');
             const firstName = nameParts[0] || 'مستخدم';
@@ -269,9 +254,8 @@ async function loginWithGoogle() {
         window.showToast?.('تم تسجيل الدخول بجوجل بنجاح!', 'success');
         
     } catch (error) {
-        console.error("Google Login Error:", error);
-        if (error.code === 'auth/popup-blocked') {
-            window.showToast?.('تم حظر النافذة المنبثقة. جاري محاولة تسجيل الدخول عبر التحويل...', 'info');
+        if (error.code === 'auth/popup-blocked' || (error.message || '').includes('cross-origin') || (error.message || '').includes('cookies')) {
+            window.showToast?.('جاري محاولة تسجيل الدخول عبر التحويل...', 'info');
             try {
                 await signInWithRedirect(auth, provider);
             } catch (err2) {
@@ -279,7 +263,14 @@ async function loginWithGoogle() {
                 window.showToast?.('فشل تسجيل الدخول. يرجى التأكد من إعدادات المتصفح.', 'error');
             }
         } else if (error.code !== 'auth/popup-closed-by-user') {
-            window.showToast?.('فشل تسجيل الدخول بجوجل. يرجى المحاولة لاحقاً.', 'error');
+            window.showToast?.(`فشل تسجيل الدخول: ${error.message}`, 'error');
+        } else {
+            // Popup closed by user or browser forcefully closed it.
+            // On some mobile devices, popup closes automatically. Fallback to redirect.
+            if (window.innerWidth <= 768) {
+                 window.showToast?.('جاري محاولة تسجيل الدخول...', 'info');
+                 signInWithRedirect(auth, provider).catch(e => console.error(e));
+            }
         }
     }
 }

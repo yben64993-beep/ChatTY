@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tunisia-brain-v3';
+const CACHE_NAME = 'tunisia-brain-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -25,12 +25,12 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then((response) => response || fetch(event.request))
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });

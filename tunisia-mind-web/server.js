@@ -35,44 +35,7 @@ const verificationCodes = new Map();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// الرابط الخارجي لتطبيق Lovable - يمكن تغييره من ملف .env
-const LOVABLE_TARGET_URL = process.env.LOVABLE_TARGET_URL || 'https://chatty-34d4.onrender.com';
-
-// ==========================================
-// 🔄 الوكيل العكسي (Reverse Proxy) لمسار /sites
-// يعمل فقط إذا تم تعيين LOVABLE_TARGET_URL في .env
-// ==========================================
-const isValidLovableUrl = LOVABLE_TARGET_URL && !LOVABLE_TARGET_URL.includes('YOUR-LOVABLE-PROJECT');
-if (isValidLovableUrl) {
-    app.use(
-        '/sites',
-        createProxyMiddleware({
-            target: LOVABLE_TARGET_URL,
-            changeOrigin: true,
-            ws: true,
-            pathRewrite: { '^/sites': '' },
-            on: {
-                error: (err, req, res) => {
-                    console.error('Proxy error:', err.message);
-                    if (!res.headersSent) {
-                        res.status(502).json({ error: 'Proxy connection failed' });
-                    }
-                }
-            },
-            onProxyRes: (proxyRes) => {
-                delete proxyRes.headers['x-frame-options'];
-                delete proxyRes.headers['content-security-policy'];
-            }
-        })
-    );
-    console.log(`✅ Proxy for /sites -> ${LOVABLE_TARGET_URL}`);
-} else {
-    // fallback: /sites returns 503 gracefully instead of crashing the server
-    app.use('/sites', (req, res) => {
-        res.status(503).json({ error: 'Website hosting service not configured.' });
-    });
-    console.warn('⚠️  LOVABLE_TARGET_URL not configured — /sites proxy is disabled.');
-}
+// تم إزالة الوكيل العكسي /sites بناء على طلب المستخدم
 
 app.use(helmet({
     contentSecurityPolicy: false, // Allow external resources like images/fonts more easily for this demo
