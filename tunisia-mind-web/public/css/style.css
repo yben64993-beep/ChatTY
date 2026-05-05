@@ -758,9 +758,8 @@ select {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    padding: 1.5rem 1rem 2rem;
+    padding: 1.5rem 1rem 120px; /* Increased bottom padding to prevent input overlap */
     flex-shrink: 0;
-    /* grows with content; chat-container scrolls */
 }
 
 /* Message bubbles */
