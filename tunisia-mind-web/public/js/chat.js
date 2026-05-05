@@ -833,69 +833,9 @@ function initChat() {
         };
     }
 
-    if (videoIn) {
-        videoIn.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            if (file.size > 50 * 1024 * 1024) {
-                window.showToast?.('Video too large (Max 50MB)', 'error');
-                videoIn.value = '';
-                return;
-            }
 
-            const lang = window.currentLang || localStorage.getItem('mindtyLang') || 'ar';
-            const t = window.translations?.[lang] || window.translations?.['ar'];
 
-            const videoUrl = URL.createObjectURL(file);
-            const tempVid = document.createElement('video');
-            tempVid.src = videoUrl;
-            tempVid.muted = true;
-            tempVid.play();
 
-            tempVid.onloadedmetadata = async () => {
-                if (tempVid.duration > 60) { 
-                    window.showToast?.('Max video duration is 60s.', 'error');
-                    videoIn.value = '';
-                    return;
-                }
-                window.showToast?.(t.processing_video, 'info');
-                const frames = await extractFrames(tempVid);
-                attachedVideoFrames = frames;
-                attachedFileName = file.name;
-                updateFilePreview('image', frames[0]);
-                window.showToast?.(t.ready_for_analysis, 'success');
-                tempVid.pause();
-                URL.revokeObjectURL(videoUrl);
-            };
-        };
-    }
-
-    async function extractFrames(videoElem) {
-        return new Promise(async (resolve) => {
-            const canvas = document.getElementById('hiddenCanvas') || document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const frames = [];
-            const duration = videoElem.duration;
-            
-            // Extract exactly 10 frames distributed across the video
-            const frameCount = 10;
-            const interval = duration / (frameCount - 1);
-            
-            for (let i = 0; i < frameCount; i++) {
-                videoElem.currentTime = i * interval;
-                await new Promise(r => videoElem.onseeked = r);
-                
-                // Scale down for faster API processing
-                const scale = Math.min(1, 512 / Math.max(videoElem.videoWidth, videoElem.videoHeight));
-                canvas.width = videoElem.videoWidth * scale;
-                canvas.height = videoElem.videoHeight * scale;
-                
-                ctx.drawImage(videoElem, 0, 0, canvas.width, canvas.height);
-                frames.push(canvas.toDataURL('image/jpeg', 0.7));
-            }
-            resolve(frames);
-        });
-    }
 
 
     // Cancel image/file preview

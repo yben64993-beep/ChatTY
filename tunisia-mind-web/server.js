@@ -35,7 +35,9 @@ const PORT = process.env.PORT || 3000;
 // تم إزالة الوكيل العكسي /sites بناء على طلب المستخدم
 
 app.use(helmet({
-    contentSecurityPolicy: false, // Allow external resources like images/fonts more easily for this demo
+    contentSecurityPolicy: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginEmbedderPolicy: false
 }));
 
 const limiter = rateLimit({

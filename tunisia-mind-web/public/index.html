@@ -183,8 +183,6 @@
                 <!-- Hidden File Inputs & Helpers (outside flex flow) -->
                 <input type="file" id="fileInputAlpha" style="display:none;" accept=".txt,.js,.py,.html,.css,.json,.md,.csv,.xml,.ts,.jsx,.vue,.sql,.pdf">
                 <input type="file" id="imageInput" style="display:none;" accept="image/*">
-                <input type="file" id="videoInput" style="display:none;" accept="video/*">
-                <video id="hiddenVideo" style="display:none;" muted></video>
                 <canvas id="hiddenCanvas" style="display:none;"></canvas>
 
                 <div class="input-container" id="inputContainer">
@@ -203,11 +201,6 @@
                             <div class="context-menu-item" onclick="window.showFutureUpdate(); this.parentElement.classList.remove('active');">
                                 <i class="fa-solid fa-image" style="color:#6b7280;"></i>
                                 <span data-i18n="upload_image">رفع صورة للتحليل</span>
-                                <i class="fa-solid fa-lock" style="font-size:0.7rem; margin-right:auto; opacity:0.5;"></i>
-                            </div>
-                            <div class="context-menu-item" onclick="window.showFutureUpdate(); this.parentElement.classList.remove('active');">
-                                <i class="fa-solid fa-video" style="color:#6b7280;"></i>
-                                <span data-i18n="upload_video">تحليل فيديو (20ث)</span>
                                 <i class="fa-solid fa-lock" style="font-size:0.7rem; margin-right:auto; opacity:0.5;"></i>
                             </div>
                         </div>
