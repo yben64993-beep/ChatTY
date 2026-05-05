@@ -48,75 +48,7 @@
 </head>
 
 <body class="dark-theme">
-    <!-- Video Splash Screen -->
-    <div id="splashScreen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#050505; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:99999; transition:opacity 0.5s ease-out;">
-        
-        <!-- Welcome / Enter Screen -->
-        <div id="splashEnterScreen" style="text-align:center; z-index:2; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%;">
-            <div style="margin-bottom: 40px; animation: pulse 2s infinite;">
-                <h1 style="color:#fff; font-family:'Inter', sans-serif; font-size:3.5rem; font-weight:700; margin:0; letter-spacing: 2px; text-shadow:0 0 30px rgba(16, 185, 129, 0.6);">MindTY</h1>
-                <p style="color:#aaa; font-family:'Noto Sans Arabic', sans-serif; font-size:1.2rem; margin-top:10px;">أهلاً بك في منصة الذكاء الاصطناعي</p>
-            </div>
-            
-            <button id="enterSiteBtn" style="background:linear-gradient(135deg, #10b981, #0ea5e9); color:white; border:none; padding:18px 45px; font-size:1.3rem; font-family:'Noto Sans Arabic', sans-serif; font-weight:700; border-radius:30px; cursor:pointer; box-shadow:0 10px 30px rgba(16, 185, 129, 0.5); transition:transform 0.2s, box-shadow 0.2s; display:flex; align-items:center; gap:10px;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                اضغط للدخول <i class="fa-solid fa-play"></i>
-            </button>
-        </div>
 
-        <!-- The Video -->
-        <video id="splashVideo" src="assets/logo-video.mp4" playsinline preload="auto" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:contain; display:none; background:#000; z-index:1;"></video>
-        
-        <style>
-            @keyframes pulse {
-                0% { transform: scale(1); }
-                50% { transform: scale(1.03); }
-                100% { transform: scale(1); }
-            }
-        </style>
-    </div>
-    
-    <script>
-        window.addEventListener('load', () => {
-            const enterBtn = document.getElementById('enterSiteBtn');
-            const splashEnterScreen = document.getElementById('splashEnterScreen');
-            const splashVideo = document.getElementById('splashVideo');
-            const splashScreen = document.getElementById('splashScreen');
-
-            if (enterBtn && splashVideo) {
-                enterBtn.addEventListener('click', () => {
-                    // Hide enter screen, show video
-                    splashEnterScreen.style.display = 'none';
-                    splashVideo.style.display = 'block';
-                    
-                    // Play video with sound
-                    splashVideo.play().catch(e => {
-                        console.error("Video play failed:", e);
-                        finishSplash(); // fallback if video fails
-                    });
-
-                    // When video ends, enter site
-                    splashVideo.onended = () => {
-                        finishSplash();
-                    };
-                });
-            } else {
-                finishSplash();
-            }
-
-            function finishSplash() {
-                if (splashScreen) {
-                    splashScreen.style.opacity = '0';
-                    setTimeout(() => {
-                        splashScreen.remove();
-                        // تفعيل تسجيل الدخول بجوجل فقط إذا لم يكن مسجلاً
-                        if (!window.currentUser && window.showAuthModal) {
-                            window.showAuthModal();
-                        }
-                    }, 500);
-                }
-            }
-        });
-    </script>
 
     <div class="wallpaper-overlay" id="wallpaperOverlay"></div>
     <div class="app-container">

@@ -124,7 +124,6 @@ function showLoadingToast() {
 }
 
 function showAuthModal() {
-    if (document.getElementById('splashScreen')) return;
     const m = document.getElementById('authModal');
     if (m) { m.style.display = 'flex'; m.classList.add('active'); }
 }
@@ -137,13 +136,14 @@ window.hideAuthModal = hideAuthModal;
 
 // Handle Redirect Result (for mobile/blocked popups)
 getRedirectResult(auth).then((result) => {
-    if (result?.user) hideAuthModal();
+    if (result?.user) {
+        hideAuthModal();
+    }
 }).catch(e => {
-    console.error("Firebase Redirect Error:", e);
-    if (e.code && e.code !== 'auth/popup-closed-by-user') {
-        // إذا كان الخطأ متعلق بالنطاق، سنظهره بوضوح
+    if (e.code && e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+        console.error("Firebase Auth Error:", e.code, e.message);
         if (e.code === 'auth/unauthorized-domain') {
-            alert("خطأ Firebase: هذا النطاق (Domain) غير مضاف في Authorized Domains في Firebase Console.");
+            alert("خطأ فني: يجب إضافة الدومين chatty-34d4.onrender.com في إعدادات Firebase Console ليتمكن المستخدمون من الدخول.");
         } else {
             window.showToast?.("خطأ في تسجيل الدخول: " + e.code, "error");
         }
@@ -272,7 +272,7 @@ async function loginWithGoogle() {
         window.showToast?.('تم تسجيل الدخول بجوجل بنجاح!', 'success');
     } catch (error) {
         console.error("Google Auth Error Details:", error);
-        
+
         // إذا كان النطاق غير مسموح به، نتوقف هنا ولا نعيد تحميل الصفحة
         if (error.code === 'auth/unauthorized-domain') {
             alert("خطأ Firebase: يرجى إضافة هذا الرابط في Firebase Console > Authentication > Settings > Authorized Domains");
@@ -283,8 +283,11 @@ async function loginWithGoogle() {
             window.showToast?.('جاري محاولة تسجيل الدخول عبر التحويل...', 'info');
             await signInWithRedirect(auth, provider);
         } else if (error.code === 'auth/popup-closed-by-user') {
-            // لا تفعل شيئاً إذا أغلق المستخدم النافذة بنفسه
-            return;
+            // إذا حدث هذا على الهاتف، ننتقل تلقائياً لنظام التحويل لضمان الدخول
+            if (window.innerWidth <= 768) {
+                window.showToast?.('تم حظر النافذة المنبثقة، جاري التحويل...', 'info');
+                await signInWithRedirect(auth, provider);
+            }
         } else {
             // لأي خطأ آخر، نحاول التحويل بعد تنبيه المستخدم
             window.showToast?.("خطأ: " + error.code, "error");

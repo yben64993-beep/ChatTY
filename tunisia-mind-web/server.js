@@ -48,16 +48,21 @@ app.use('/api/', limiter);
 app.use(cors());
 app.use(bodyParser.json({ limit: '100mb' }));
 
-// مِيدل وير لفرض منع التخزين المؤقت على جميع الطلبات قبل إرسال الملفات
 app.use((req, res, next) => {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '-1');
+    res.setHeader('Expires', '0');
     res.setHeader('Surrogate-Control', 'no-store');
     next();
 });
 
-app.use(express.static(path.join(__dirname, 'public'), { etag: false, lastModified: false }));
+app.use(express.static(path.join(__dirname, 'public'), {
+    etag: false,
+    lastModified: false,
+    setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    }
+}));
 
 const SYSTEM_PROMPT = `
 أنت مساعد ذكاء اصطناعي متقدم اسمه "MindTY". أنت مساعد ذكي، ودود، ومفيد جداً.
@@ -759,5 +764,10 @@ app.get(/^\/site\/([^\/]+)\/(.*)/, async (req, res) => {
     }
 });
 
-app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get(/.*/, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'), { etag: false });
+});
 app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
