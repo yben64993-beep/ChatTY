@@ -649,7 +649,10 @@ function initWebsiteBuilderLogic() {
             }
 
             // إغلاق المودال فوراً وإبلاغ المستخدم
-            bootstrap.Modal.getInstance(document.getElementById('websiteBuilderModal')).hide();
+            const modalEl = document.getElementById('websiteBuilderModal');
+            const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            modalInstance.hide();
+            
             if (window.showNotification) {
                 showNotification("🚀 بدأنا بناء موقعك! سنقوم بإخطارك وفتح نافذة الروابط فور الجاهزية.", "info");
             } else {
@@ -672,6 +675,7 @@ function initWebsiteBuilderLogic() {
 
                 try {
                     const statusRes = await fetch(`/api/publish-status/${jobId}`);
+                    if (!statusRes.ok) throw new Error(`Status check failed: ${statusRes.status}`);
                     const status = await statusRes.json();
 
                     if (status.status === 'done') {
@@ -681,8 +685,8 @@ function initWebsiteBuilderLogic() {
                         if (window.showNotification) showNotification("✅ اكتمل بناء موقعك بنجاح!", "success");
 
                         // فتح المودال تلقائياً وإظهار النتيجة
-                        const modal = new bootstrap.Modal(document.getElementById('websiteBuilderModal'));
-                        modal.show();
+                        const resultModal = new bootstrap.Modal(document.getElementById('websiteBuilderModal'));
+                        resultModal.show();
 
                         const resArea = document.getElementById('wb-result-area');
                         const resMsg = document.getElementById('wb-result-message');
@@ -705,6 +709,7 @@ function initWebsiteBuilderLogic() {
                         clearInterval(pollInterval);
                         if (window.showNotification) showNotification(`❌ فشل بناء الموقع: ${status.message}`, "error");
                         submitBtn.disabled = false;
+                        document.getElementById('wb-loading').style.display = 'none';
                     }
                 } catch (pollErr) {
                     console.warn('Polling error:', pollErr.message);
@@ -712,9 +717,10 @@ function initWebsiteBuilderLogic() {
             }, 5000);
 
         } catch (e) {
+            console.error("Website Builder API Error:", e);
             document.getElementById('wb-loading').style.display = 'none';
             submitBtn.disabled = false;
-            showError("فشل الاتصال بالخادم. حاول مرة أخرى.");
+            showError("فشل الاتصال بالخادم. قد يكون السيرفر في حالة إعادة تشغيل، يرجى المحاولة بعد دقيقة.");
         }
     };
 
