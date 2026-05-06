@@ -679,7 +679,7 @@ app.post('/api/publish-website', async (req, res) => {
             publishJobs[jobId] = {
                 status: 'done',
                 message: data.message || 'تم إنشاء الموقع بنجاح! 🎉',
-                direct_url: data.direct_url || data.url || `/site/${payload.slug}`,
+                direct_url: data.direct_url || data.url || `https://publishwebsitetunisiaindai.lovable.app/sites/${payload.slug}`,
                 slug: payload.slug
             };
         } catch (e) {
