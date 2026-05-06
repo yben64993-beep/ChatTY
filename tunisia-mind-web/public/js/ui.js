@@ -657,10 +657,10 @@ function initWebsiteBuilderLogic() {
                 return;
             }
 
-            // إغلاق المودال فوراً وإبلاغ المستخدم
+            // إغلاق المودال فوراً وإبلاغ المستخدم (استخدام النظام الخاص بالمشروع بدلاً من Bootstrap)
             const modalEl = document.getElementById('websiteBuilderModal');
-            const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-            modalInstance.hide();
+            modalEl.style.display = 'none';
+            modalEl.classList.remove('active');
             
             if (window.showNotification) {
                 showNotification("🚀 بدأنا بناء موقعك! سنقوم بإخطارك وفتح نافذة الروابط فور الجاهزية.", "info");
@@ -693,9 +693,10 @@ function initWebsiteBuilderLogic() {
                         // إخطار المستخدم بالنجاح
                         if (window.showNotification) showNotification("✅ اكتمل بناء موقعك بنجاح!", "success");
 
-                        // فتح المودال تلقائياً وإظهار النتيجة
-                        const resultModal = new bootstrap.Modal(document.getElementById('websiteBuilderModal'));
-                        resultModal.show();
+                        // فتح المودال تلقائياً (استخدام النظام الخاص بالمشروع)
+                        const resultModal = document.getElementById('websiteBuilderModal');
+                        resultModal.style.display = 'flex';
+                        setTimeout(() => resultModal.classList.add('active'), 10);
 
                         const resArea = document.getElementById('wb-result-area');
                         const resMsg = document.getElementById('wb-result-message');
