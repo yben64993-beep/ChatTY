@@ -636,9 +636,18 @@ function initWebsiteBuilderLogic() {
             // الخطوة 1: إرسال الطلب والحصول على job_id فوراً
             const response = await fetch('/api/publish-website', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
                 body: JSON.stringify(payload)
             });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Server responded with ${response.status}: ${errText}`);
+            }
+
             const data = await response.json();
 
             if (!data.success && data.status !== 'processing') {
@@ -717,10 +726,10 @@ function initWebsiteBuilderLogic() {
             }, 5000);
 
         } catch (e) {
-            console.error("Website Builder API Error:", e);
+            console.error("Website Builder API Error Details:", e);
             document.getElementById('wb-loading').style.display = 'none';
             submitBtn.disabled = false;
-            showError("فشل الاتصال بالخادم. قد يكون السيرفر في حالة إعادة تشغيل، يرجى المحاولة بعد دقيقة.");
+            showError(`فشل الاتصال: ${e.message}`);
         }
     };
 
