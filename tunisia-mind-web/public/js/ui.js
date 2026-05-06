@@ -657,7 +657,11 @@ function initWebsiteBuilderLogic() {
                 return;
             }
 
-            // إغلاق المودال فوراً وإبلاغ المستخدم (استخدام النظام الخاص بالمشروع بدلاً من Bootstrap)
+            // حفظ الـ jobId للمتابعة حتى لو أغلق المستخدم الصفحة
+            const jobId = data.job_id;
+            localStorage.setItem('wb_active_job', jobId);
+
+            // إغلاق المودال فوراً وإبلاغ المستخدم
             const modalEl = document.getElementById('websiteBuilderModal');
             modalEl.style.display = 'none';
             modalEl.classList.remove('active');
@@ -668,63 +672,8 @@ function initWebsiteBuilderLogic() {
                 alert("🚀 بدأنا بناء موقعك! سنقوم بإخطارك وفتح نافذة الروابط فور الجاهزية.");
             }
 
-            // الخطوة 2: الاستعلام عن الحالة في الخلفية
-            const jobId = data.job_id;
-            let elapsed = 0;
-            const maxWait = 600; // 10 دقائق كحد أقصى للعمليات الطويلة جداً
-
-            const pollInterval = setInterval(async () => {
-                elapsed += 5;
-
-                if (elapsed >= maxWait) {
-                    clearInterval(pollInterval);
-                    if (window.showNotification) showNotification("⚠️ استغرقت العملية وقتاً طويلاً جداً. يرجى التحقق لاحقاً.", "error");
-                    return;
-                }
-
-                try {
-                    const statusRes = await fetch(`/api/publish-status/${jobId}`);
-                    if (!statusRes.ok) throw new Error(`Status check failed: ${statusRes.status}`);
-                    const status = await statusRes.json();
-
-                    if (status.status === 'done') {
-                        clearInterval(pollInterval);
-                        
-                        // إخطار المستخدم بالنجاح
-                        if (window.showNotification) showNotification("✅ اكتمل بناء موقعك بنجاح!", "success");
-
-                        // فتح المودال تلقائياً (استخدام النظام الخاص بالمشروع)
-                        const resultModal = document.getElementById('websiteBuilderModal');
-                        resultModal.style.display = 'flex';
-                        setTimeout(() => resultModal.classList.add('active'), 10);
-
-                        const resArea = document.getElementById('wb-result-area');
-                        const resMsg = document.getElementById('wb-result-message');
-                        const resLink = document.getElementById('wb-result-link');
-                        
-                        // تصفير الواجهة قبل إظهار الرابط
-                        document.getElementById('wb-loading').style.display = 'none';
-                        submitBtn.disabled = false;
-                        
-                        resArea.style.display = 'block';
-                        resMsg.innerText = status.message || "تم تجهيز الموقع بنجاح!";
-                        if (status.direct_url) {
-                            resLink.href = status.direct_url;
-                            resLink.style.display = 'inline-block';
-                        } else {
-                            resLink.style.display = 'none';
-                        }
-
-                    } else if (status.status === 'error') {
-                        clearInterval(pollInterval);
-                        if (window.showNotification) showNotification(`❌ فشل بناء الموقع: ${status.message}`, "error");
-                        submitBtn.disabled = false;
-                        document.getElementById('wb-loading').style.display = 'none';
-                    }
-                } catch (pollErr) {
-                    console.warn('Polling error:', pollErr.message);
-                }
-            }, 5000);
+            // بدء المتابعة
+            trackJobStatus(jobId);
 
         } catch (e) {
             console.error("Website Builder API Error Details:", e);
@@ -734,10 +683,87 @@ function initWebsiteBuilderLogic() {
         }
     };
 
+    // دالة لمتابعة حالة المهمة (تعمل بشكل مستقل)
+    async function trackJobStatus(jobId) {
+        let elapsed = 0;
+        const maxWait = 720; // زيادة وقت الانتظار لـ 12 دقيقة (720 ثانية)
+        const submitBtn = document.getElementById('wb-submit-btn');
+
+        const pollInterval = setInterval(async () => {
+            elapsed += 5;
+
+            if (elapsed >= maxWait) {
+                clearInterval(pollInterval);
+                localStorage.removeItem('wb_active_job');
+                if (window.showNotification) showNotification("⚠️ استغرقت العملية وقتاً طويلاً جداً. يرجى التحقق لاحقاً.", "error");
+                return;
+            }
+
+            try {
+                const statusRes = await fetch(`/api/publish-status/${jobId}`);
+                if (!statusRes.ok) throw new Error(`Status check failed: ${statusRes.status}`);
+                const status = await statusRes.json();
+
+                if (status.status === 'done') {
+                    clearInterval(pollInterval);
+                    localStorage.removeItem('wb_active_job');
+                    
+                    if (window.showNotification) showNotification("✅ اكتمل بناء موقعك بنجاح!", "success");
+
+                    // فتح المودال تلقائياً وإظهار النتيجة
+                    const resultModal = document.getElementById('websiteBuilderModal');
+                    resultModal.style.display = 'flex';
+                    setTimeout(() => resultModal.classList.add('active'), 10);
+
+                    const resArea = document.getElementById('wb-result-area');
+                    const resMsg = document.getElementById('wb-result-message');
+                    const resLink = document.getElementById('wb-result-link');
+                    
+                    document.getElementById('wb-loading').style.display = 'none';
+                    if (submitBtn) submitBtn.disabled = false;
+                    
+                    resArea.style.display = 'block';
+                    resMsg.innerText = status.message || "تم تجهيز الموقع بنجاح!";
+                    if (status.direct_url) {
+                        resLink.href = status.direct_url;
+                        resLink.style.display = 'inline-block';
+                    } else {
+                        resLink.style.display = 'none';
+                    }
+
+                } else if (status.status === 'error') {
+                    clearInterval(pollInterval);
+                    localStorage.removeItem('wb_active_job');
+                    
+                    if (window.showNotification) showNotification(`❌ فشل بناء الموقع: ${status.message}`, "error");
+                    
+                    // إظهار الخطأ في المودال لو كان مفتوحاً
+                    const modalEl = document.getElementById('websiteBuilderModal');
+                    if (modalEl.style.display === 'flex') {
+                        showError(status.message);
+                        document.getElementById('wb-loading').style.display = 'none';
+                        if (submitBtn) submitBtn.disabled = false;
+                    }
+                }
+            } catch (pollErr) {
+                console.warn('Polling error:', pollErr.message);
+            }
+        }, 5000);
+    }
+
+    // فحص إذا كان هناك طلب قيد التنفيذ عند فتح الصفحة
+    const savedJob = localStorage.getItem('wb_active_job');
+    if (savedJob) {
+        trackJobStatus(savedJob);
+    }
+
     function showError(msg) {
         const errArea = document.getElementById('wb-error-area');
-        document.getElementById('wb-error-message').innerText = msg;
-        errArea.style.display = 'block';
+        const errMsg = document.getElementById('wb-error-message');
+        if (errArea && errMsg) {
+            errMsg.innerText = msg;
+            errArea.style.display = 'block';
+        }
     }
 }
 

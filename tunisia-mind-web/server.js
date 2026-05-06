@@ -655,28 +655,35 @@ app.post('/api/publish-website', async (req, res) => {
 
             const response = await fetch(publishUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-deploy-key': deployApiKey },
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'x-deploy-key': deployApiKey 
+                },
                 body: JSON.stringify({
                     ...payload,
                     language: 'ar',
                     brand_badge: true
                 }),
-                signal: AbortSignal.timeout(300000) // 5 دقائق كحد أقصى للعمليات الخارجية
+                signal: AbortSignal.timeout(600000) // رفع المهلة إلى 10 دقائق
             });
 
             const contentType = response.headers.get('content-type') || '';
             if (!contentType.includes('application/json')) {
                 const rawText = await response.text();
-                console.error(`[JOB ${jobId}] Non-JSON:`, response.status, rawText.slice(0, 200));
-                publishJobs[jobId] = { status: 'error', message: `خادم النشر أرجع استجابة غير متوقعة (${response.status}).` };
+                console.error(`[JOB ${jobId}] Non-JSON Response (${response.status}):`, rawText.slice(0, 500));
+                publishJobs[jobId] = { 
+                    status: 'error', 
+                    message: `خادم النشر أرجع خطأ تقني (${response.status}). يرجى التأكد من الـ Prompt أو المحاولة لاحقاً.` 
+                };
                 return;
             }
 
             const data = await response.json();
-            console.log(`📥 [JOB ${jobId}] (${response.status}):`, JSON.stringify(data).slice(0, 200));
+            console.log(`📥 [JOB ${jobId}] Response (${response.status}):`, JSON.stringify(data).slice(0, 200));
 
             if (!response.ok) {
-                publishJobs[jobId] = { status: 'error', message: data.error || data.message || 'حدث خطأ أثناء النشر' };
+                const errorMsg = data.error || data.message || `خطأ من خادم النشر (${response.status})`;
+                publishJobs[jobId] = { status: 'error', message: errorMsg };
                 return;
             }
 
@@ -687,8 +694,11 @@ app.post('/api/publish-website', async (req, res) => {
                 slug: payload.slug
             };
         } catch (e) {
-            console.error(`❌ [JOB ${jobId}] Error:`, e.message);
-            publishJobs[jobId] = { status: 'error', message: 'فشل الاتصال بخادم النشر: ' + e.message };
+            console.error(`❌ [JOB ${jobId}] Fatal Error:`, e.message);
+            let userFriendlyMsg = 'فشل الاتصال بخادم النشر الخارجي.';
+            if (e.name === 'TimeoutError') userFriendlyMsg = 'استغرقت عملية بناء الموقع وقتاً طويلاً جداً (أكثر من 10 دقائق).';
+            
+            publishJobs[jobId] = { status: 'error', message: `${userFriendlyMsg} (التفاصيل: ${e.message})` };
         }
         // تنظيف الوظائف القديمة (+1 ساعة)
         const oneHour = 3600000;
