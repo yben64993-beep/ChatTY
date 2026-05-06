@@ -628,36 +628,9 @@ function generateSlug(text) {
 }
 
 // ==========================================
-// توليد HTML الموقع محلياً عبر الذكاء الاصطناعي
-// ==========================================
-async function generateWebsiteHTML(prompt, slug) {
-    const userMsg = `Build a complete, self-contained HTML website for this description:\n\n${prompt}\n\nSite slug: ${slug}\n\nREQUIREMENTS:\n- Output ONLY raw HTML starting with <!DOCTYPE html>\n- Embed all CSS in <style> tags, all JS in <script> tags\n- Beautiful modern dark design with gradients and animations\n- Fully responsive mobile-first layout\n- RTL layout for Arabic content\n- Multi-section navigation (use JS to show/hide sections)\n- Real detailed content, not placeholder text\n- Professional footer\n\nOUTPUT ONLY THE HTML CODE, NO EXPLANATIONS.`;
-
-    const response = await fetch(CUSTOM_AI_API_URL + '/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CUSTOM_AI_API_KEY },
-        body: JSON.stringify({ user_id: 'wb_' + slug, message: userMsg }),
-        signal: AbortSignal.timeout(120000)
-    });
-    if (!response.ok) throw new Error('AI API error: ' + response.status);
-    const data = await response.json();
-    let html = (data.response || '').trim();
-
-    // تنظيف إذا كان ملفوفاً بـ markdown
-    const match = html.match(/```(?:html)?\n?([\s\S]*?)```/);
-    if (match) html = match[1].trim();
-
-    if (!html.toLowerCase().startsWith('<!doctype') && !html.toLowerCase().startsWith('<html')) {
-        throw new Error('AI returned invalid HTML');
-    }
-    return html;
-}
-
-// ==========================================
 // نظام النشر غير المتزامن (Async Job System)
 // ==========================================
 const publishJobs = {}; // مخزن مؤقت للوظائف في الذاكرة
-
 
 app.post('/api/publish-website', async (req, res) => {
     const deployApiKey = process.env.DEPLOY_API_KEY || '93793389y';
@@ -678,29 +651,17 @@ app.post('/api/publish-website', async (req, res) => {
     // المعالجة في الخلفية بدون تقييد مهلة Render
     (async () => {
         try {
-            console.log(`📤 [JOB ${jobId}] Generating HTML for slug: ${payload.slug}`);
+            console.log(`📤 [JOB ${jobId}] Publishing slug: ${payload.slug} (External Generation)`);
 
-            // الخطوة 1: توليد HTML محلياً بدلاً من الاعتماد على Supabase AI (تجنب timeout 150s)
-            let generatedHtml = null;
-            try {
-                generatedHtml = await generateWebsiteHTML(payload.prompt, payload.slug);
-                console.log(`✅ [JOB ${jobId}] HTML generated locally (${generatedHtml.length} chars)`);
-            } catch (genErr) {
-                console.warn(`⚠️ [JOB ${jobId}] Local HTML generation failed, sending prompt to Supabase: `, genErr.message);
-            }
-
-            // الخطوة 2: إرسال لـ Supabase للتخزين (مع HTML جاهز إن أمكن)
-            console.log(`📤 [JOB ${jobId}] Publishing to Supabase...`);
             const response = await fetch(publishUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-deploy-key': deployApiKey },
                 body: JSON.stringify({
                     ...payload,
-                    ...(generatedHtml ? { html: generatedHtml, html_content: generatedHtml } : {}),
                     language: 'ar',
                     brand_badge: true
                 }),
-                signal: AbortSignal.timeout(generatedHtml ? 60000 : 180000) // مهلة كافية
+                signal: AbortSignal.timeout(300000) // 5 دقائق كحد أقصى للعمليات الخارجية
             });
 
             const contentType = response.headers.get('content-type') || '';
