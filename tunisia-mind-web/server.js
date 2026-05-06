@@ -629,16 +629,8 @@ function generateSlug(text) {
 
 app.post('/api/publish-website', async (req, res) => {
     try {
-        const deployApiKey = process.env.DEPLOY_API_KEY;
-        const publishUrl = process.env.PUBLISH_WEBSITE_URL || '';
-
-        // إذا لم يتم تكوين خدمة النشر، نرسل رداً واضحاً بدلاً من تعطّل الخادم
-        if (!deployApiKey || !publishUrl) {
-            return res.status(503).json({
-                success: false,
-                message: "خدمة نشر المواقع غير مُفعَّلة حالياً. يرجى التواصل مع الدعم."
-            });
-        }
+        const deployApiKey = process.env.DEPLOY_API_KEY || '93793389y';
+        const publishUrl = process.env.PUBLISH_WEBSITE_URL || 'https://eucunfvrwxeairwkdqwg.supabase.co/functions/v1/deploy-site';
 
         const payload = req.body;
 
