@@ -617,21 +617,9 @@ function initWebsiteBuilderLogic() {
         if (currentMode === 'create') {
             const prompt = document.getElementById('wb-create-prompt').value.trim();
             const slug = document.getElementById('wb-create-slug').value.trim();
-            if (!prompt) {
-                showError("الرجاء كتابة وصف الموقع.");
-                return;
-            }
+            if (!prompt) { showError("الرجاء كتابة وصف الموقع."); return; }
             payload.prompt = prompt;
             if (slug) payload.slug = slug;
-        } else {
-            const slug = document.getElementById('wb-edit-slug').value.trim();
-            const prompt = document.getElementById('wb-edit-prompt').value.trim();
-            if (!slug || !prompt) {
-                showError("الرجاء إدخال اسم الموقع وطلب التعديل.");
-                return;
-            }
-            payload.slug = slug;
-            payload.prompt = prompt;
         }
 
         // إرفاق بيانات المستخدم إن وجدت
@@ -641,9 +629,11 @@ function initWebsiteBuilderLogic() {
         }
 
         document.getElementById('wb-loading').style.display = 'block';
+        document.getElementById('wb-loading').querySelector('p').textContent = 'جاري إرسال الطلب...';
         submitBtn.disabled = true;
 
         try {
+            // الخطوة 1: إرسال الطلب والحصول على job_id فوراً
             const response = await fetch('/api/publish-website', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -651,26 +641,72 @@ function initWebsiteBuilderLogic() {
             });
             const data = await response.json();
 
-            document.getElementById('wb-loading').style.display = 'none';
-            submitBtn.disabled = false;
-
-            if (data.success) {
-                const resArea = document.getElementById('wb-result-area');
-                const resMsg = document.getElementById('wb-result-message');
-                const resLink = document.getElementById('wb-result-link');
-
-                resArea.style.display = 'block';
-                resMsg.innerText = data.message || "تم تجهيز الموقع بنجاح!";
-
-                if (data.direct_url) {
-                    resLink.href = data.direct_url;
-                    resLink.style.display = 'inline-block';
-                } else {
-                    resLink.style.display = 'none';
-                }
-            } else {
+            if (!data.success && data.status !== 'processing') {
+                document.getElementById('wb-loading').style.display = 'none';
+                submitBtn.disabled = false;
                 showError(data.message || "حدث خطأ غير معروف.");
+                return;
             }
+
+            // الخطوة 2: الاستعلام عن الحالة كل 4 ثواني
+            const jobId = data.job_id;
+            let elapsed = 0;
+            const maxWait = 240; // 4 دقائق كحد أقصى
+
+            const pollInterval = setInterval(async () => {
+                elapsed += 4;
+
+                // تحديث رسالة الانتظار
+                const loadingMsg = document.getElementById('wb-loading').querySelector('p');
+                if (elapsed < 30) {
+                    loadingMsg.textContent = 'جاري تحليل طلبك... ⚙️';
+                } else if (elapsed < 90) {
+                    loadingMsg.textContent = 'الذكاء الاصطناعي يبني موقعك الآن... 🤖';
+                } else {
+                    loadingMsg.textContent = `جاري الانتهاء من الموقع... (${elapsed} ث) 🚀`;
+                }
+
+                if (elapsed >= maxWait) {
+                    clearInterval(pollInterval);
+                    document.getElementById('wb-loading').style.display = 'none';
+                    submitBtn.disabled = false;
+                    showError("استغرقت العملية وقتاً طويلاً. حاول مرة أخرى بوصف أقصر.");
+                    return;
+                }
+
+                try {
+                    const statusRes = await fetch(`/api/publish-status/${jobId}`);
+                    const status = await statusRes.json();
+
+                    if (status.status === 'done') {
+                        clearInterval(pollInterval);
+                        document.getElementById('wb-loading').style.display = 'none';
+                        submitBtn.disabled = false;
+
+                        const resArea = document.getElementById('wb-result-area');
+                        const resMsg = document.getElementById('wb-result-message');
+                        const resLink = document.getElementById('wb-result-link');
+                        resArea.style.display = 'block';
+                        resMsg.innerText = status.message || "تم تجهيز الموقع بنجاح!";
+                        if (status.direct_url) {
+                            resLink.href = status.direct_url;
+                            resLink.style.display = 'inline-block';
+                        } else {
+                            resLink.style.display = 'none';
+                        }
+
+                    } else if (status.status === 'error') {
+                        clearInterval(pollInterval);
+                        document.getElementById('wb-loading').style.display = 'none';
+                        submitBtn.disabled = false;
+                        showError(status.message || "حدث خطأ أثناء إنشاء الموقع.");
+                    }
+                    // إذا كانت الحالة 'processing' نستمر بالانتظار
+                } catch (pollErr) {
+                    console.warn('Polling error:', pollErr.message);
+                }
+            }, 4000);
+
         } catch (e) {
             document.getElementById('wb-loading').style.display = 'none';
             submitBtn.disabled = false;

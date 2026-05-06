@@ -627,64 +627,78 @@ function generateSlug(text) {
     return base.slice(0, 62);
 }
 
+// ==========================================
+// نظام النشر غير المتزامن (Async Job System)
+// ==========================================
+const publishJobs = {}; // مخزن مؤقت للوظائف في الذاكرة
+
+
 app.post('/api/publish-website', async (req, res) => {
-    try {
-        const deployApiKey = process.env.DEPLOY_API_KEY || '93793389y';
-        const publishUrl = process.env.PUBLISH_WEBSITE_URL || 'https://eucunfvrwxeairwkdqwg.supabase.co/functions/v1/deploy-site';
+    const deployApiKey = process.env.DEPLOY_API_KEY || '93793389y';
+    const publishUrl = process.env.PUBLISH_WEBSITE_URL || 'https://eucunfvrwxeairwkdqwg.supabase.co/functions/v1/deploy-site';
 
-        const payload = req.body;
+    const payload = req.body;
 
-        // توليد slug تلقائياً إن لم يُرسَل أو كان غير صالح
-        if (!payload.slug || !/^[a-z0-9][a-z0-9-]{1,61}$/.test(payload.slug)) {
-            payload.slug = generateSlug(payload.prompt || '');
-        }
-
-        console.log(`📤 Publishing site with slug: ${payload.slug}`);
-
-        const response = await fetch(publishUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-deploy-key': deployApiKey
-            },
-            body: JSON.stringify({
-                ...payload,
-                language: 'ar',
-                brand_badge: true
-            }),
-            signal: AbortSignal.timeout(120000) // رفع المهلة لـ 2 دقيقة لأن توليد الموقع يستغرق وقتاً
-        });
-
-        // التحقق من نوع الاستجابة قبل محاولة تحليل JSON
-        const contentType = response.headers.get('content-type') || '';
-        let data;
-        if (contentType.includes('application/json')) {
-            data = await response.json();
-        } else {
-            const rawText = await response.text();
-            console.error('Publish server returned non-JSON:', response.status, rawText.slice(0, 300));
-            return res.status(response.status || 502).json({
-                success: false,
-                message: `خادم النشر أرجع استجابة غير متوقعة (${response.status}). يرجى المحاولة مجدداً.`
-            });
-        }
-
-        console.log(`📥 Publish response (${response.status}):`, JSON.stringify(data).slice(0, 200));
-
-        if (!response.ok) {
-            // data.error أو data.message — Supabase يستخدم data.error
-            const errMsg = data.error || data.message || "حدث خطأ أثناء الاتصال بمنصة النشر";
-            return res.status(response.status).json({
-                success: false,
-                message: errMsg
-            });
-        }
-
-        res.json(data);
-    } catch (e) {
-        console.error("Publish Website Error:", e);
-        res.status(500).json({ success: false, message: "فشل الاتصال بخادم النشر: " + e.message });
+    // توليد slug تلقائياً إن لم يُرسَل أو كان غير صالح
+    if (!payload.slug || !/^[a-z0-9][a-z0-9-]{1,61}$/.test(payload.slug)) {
+        payload.slug = generateSlug(payload.prompt || '');
     }
+
+    // إنشاء job_id فوري والرد على العميل قبل انتهاء مهلة Render (30 ثانية)
+    const jobId = 'pub_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    publishJobs[jobId] = { status: 'processing', slug: payload.slug, createdAt: Date.now() };
+    res.json({ success: true, status: 'processing', job_id: jobId, slug: payload.slug });
+
+    // المعالجة في الخلفية بدون تقييد مهلة Render
+    (async () => {
+        try {
+            console.log(`📤 [JOB ${jobId}] Publishing slug: ${payload.slug}`);
+            const response = await fetch(publishUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-deploy-key': deployApiKey },
+                body: JSON.stringify({ ...payload, language: 'ar', brand_badge: true }),
+                signal: AbortSignal.timeout(180000) // 3 دقائق للعمليات الطويلة
+            });
+
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                const rawText = await response.text();
+                console.error(`[JOB ${jobId}] Non-JSON:`, response.status, rawText.slice(0, 200));
+                publishJobs[jobId] = { status: 'error', message: `خادم النشر أرجع استجابة غير متوقعة (${response.status}).` };
+                return;
+            }
+
+            const data = await response.json();
+            console.log(`📥 [JOB ${jobId}] (${response.status}):`, JSON.stringify(data).slice(0, 200));
+
+            if (!response.ok) {
+                publishJobs[jobId] = { status: 'error', message: data.error || data.message || 'حدث خطأ أثناء النشر' };
+                return;
+            }
+
+            publishJobs[jobId] = {
+                status: 'done',
+                message: data.message || 'تم إنشاء الموقع بنجاح! 🎉',
+                direct_url: data.direct_url || data.url || `/site/${payload.slug}`,
+                slug: payload.slug
+            };
+        } catch (e) {
+            console.error(`❌ [JOB ${jobId}] Error:`, e.message);
+            publishJobs[jobId] = { status: 'error', message: 'فشل الاتصال بخادم النشر: ' + e.message };
+        }
+        // تنظيف الوظائف القديمة (+1 ساعة)
+        const oneHour = 3600000;
+        Object.keys(publishJobs).forEach(id => {
+            if (Date.now() - (publishJobs[id].createdAt || 0) > oneHour) delete publishJobs[id];
+        });
+    })();
+});
+
+// الاستعلام عن حالة وظيفة النشر
+app.get('/api/publish-status/:jobId', (req, res) => {
+    const job = publishJobs[req.params.jobId];
+    if (!job) return res.json({ status: 'not_found', message: 'الوظيفة غير موجودة أو انتهت.' });
+    res.json(job);
 });
 
 // ==========================================
