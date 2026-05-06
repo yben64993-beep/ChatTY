@@ -131,7 +131,7 @@ function appendMessage(content, sender, isHtml = false) {
     const avatarDiv = document.createElement('div');
     avatarDiv.className = `msg-avatar ${sender === 'ai' ? 'ai-avatar' : 'user-avatar'}`;
     if (sender === 'ai') {
-        avatarDiv.innerHTML = '<img src="assets/tunisia-brain-new.jpg" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" alt="AI">';
+        avatarDiv.innerHTML = '<img src="assets/app-icon.jpg" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" alt="AI">';
     } else {
         avatarDiv.innerHTML = '<i class="fa-solid fa-user"></i>';
     }
@@ -175,7 +175,7 @@ function appendTypingIndicator() {
     const lang = window.currentLang || localStorage.getItem('tunisiaLang') || 'ar';
     const thinkingText = window.translations?.[lang]?.thinking || "يفكر...";
     msgDiv.innerHTML = `
-        <div class="msg-avatar ai-avatar"><img src="assets/tunisia-brain-new.jpg" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" alt="AI"></div>
+        <div class="msg-avatar ai-avatar"><img src="assets/app-icon.jpg" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" alt="AI"></div>
         <div class="msg-body">
             <div style="display:flex; align-items:center; gap:10px; color:var(--text-secondary); font-size:0.9rem; font-weight:500;">
                 <span>${thinkingText}</span><div class="typing-indicator"><span></span><span></span><span></span></div>
@@ -195,7 +195,7 @@ async function startAsyncImageGeneration(prompt) {
     msgDiv.id = jobIdBox;
     msgDiv.className = 'message ai';
     msgDiv.innerHTML = `
-        <div class="msg-avatar ai-avatar"><img src="assets/tunisia-brain-new.jpg" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" alt="AI"></div>
+        <div class="msg-avatar ai-avatar"><img src="assets/app-icon.jpg" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" alt="AI"></div>
         <div class="msg-body">
             <div class="msg-content">
                 <div class="image-generation-loader">
