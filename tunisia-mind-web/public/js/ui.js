@@ -578,10 +578,14 @@ function initWebsiteBuilderLogic() {
 
     if (!openBtn || !modal) return;
 
+    // Only create mode is supported
     let currentMode = 'create';
 
     openBtn.onclick = () => {
-        window.showFutureUpdate?.();
+        window.closeModals?.();
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.add('active'), 10);
+        window.closeSidebarIfMobile?.();
     };
 
     closeBtn.onclick = () => {
@@ -589,23 +593,16 @@ function initWebsiteBuilderLogic() {
         modal.classList.remove('active');
     };
 
-    tabCreate.onclick = () => {
-        currentMode = 'create';
-        tabCreate.classList.add('active');
-        tabEdit.classList.remove('active');
-        formCreate.style.display = 'block';
-        formEdit.style.display = 'none';
-        resetFeedback();
-    };
-
-    tabEdit.onclick = () => {
-        currentMode = 'edit';
-        tabEdit.classList.add('active');
-        tabCreate.classList.remove('active');
-        formEdit.style.display = 'block';
-        formCreate.style.display = 'none';
-        resetFeedback();
-    };
+    // Create tab (only tab now)
+    if (tabCreate) {
+        tabCreate.onclick = () => {
+            currentMode = 'create';
+            tabCreate.classList.add('active');
+            if (formCreate) formCreate.style.display = 'block';
+            if (formEdit) formEdit.style.display = 'none';
+            resetFeedback();
+        };
+    }
 
     function resetFeedback() {
         document.getElementById('wb-result-area').style.display = 'none';
