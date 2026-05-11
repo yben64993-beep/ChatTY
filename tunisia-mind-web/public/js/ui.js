@@ -628,8 +628,9 @@ function initWebsiteBuilderLogic() {
             payload.owner_identifier = window.currentUser.uid;
         }
 
+        const loadingStatus = document.getElementById('wb-loading-status');
+        if (loadingStatus) loadingStatus.textContent = 'جاري إرسال الطلب...';
         document.getElementById('wb-loading').style.display = 'block';
-        document.getElementById('wb-loading').querySelector('p').textContent = 'جاري إرسال الطلب...';
         submitBtn.disabled = true;
 
         try {
@@ -666,8 +667,8 @@ function initWebsiteBuilderLogic() {
             modalEl.style.display = 'none';
             modalEl.classList.remove('active');
             
-            if (window.showNotification) {
-                showNotification("🚀 بدأنا بناء موقعك! سنقوم بإخطارك وفتح نافذة الروابط فور الجاهزية.", "info");
+            if (window.showToast) {
+                showToast("🚀 بدأنا بناء موقعك! سنقوم بإخطارك وفتح نافذة الروابط فور الجاهزية.", "info");
             } else {
                 alert("🚀 بدأنا بناء موقعك! سنقوم بإخطارك وفتح نافذة الروابط فور الجاهزية.");
             }
@@ -683,19 +684,68 @@ function initWebsiteBuilderLogic() {
         }
     };
 
+    function updateWBSidebarIndicator(active) {
+        const btn = document.getElementById('openWebsiteBuilderBtn');
+        if (!btn) return;
+        let badge = btn.querySelector('.wb-status-badge');
+        if (active) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'wb-status-badge';
+                badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                badge.style.cssText = 'margin-right:auto; margin-left:10px; font-size:0.8rem; background:rgba(255,255,255,0.2); padding:2px 6px; border-radius:10px;';
+                btn.appendChild(badge);
+            }
+            btn.style.boxShadow = '0 0 15px rgba(16,185,129,0.6)';
+        } else {
+            if (badge) badge.remove();
+            btn.style.boxShadow = '0 4px 14px rgba(16,185,129,0.35)';
+        }
+    }
+
     // دالة لمتابعة حالة المهمة (تعمل بشكل مستقل)
     async function trackJobStatus(jobId) {
         let elapsed = 0;
-        const maxWait = 720; // زيادة وقت الانتظار لـ 12 دقيقة (720 ثانية)
+        const maxWait = 720; // 12 minutes
         const submitBtn = document.getElementById('wb-submit-btn');
+
+        updateWBSidebarIndicator(true);
+
+        const updateSteps = (seconds) => {
+            const stepGen = document.getElementById('step-gen');
+            const stepCode = document.getElementById('step-code');
+            const stepDeploy = document.getElementById('step-deploy');
+            const loadingStatus = document.getElementById('wb-loading-status');
+
+            if (seconds < 15) {
+                if (loadingStatus) loadingStatus.textContent = 'جاري تحليل طلبك...';
+                if (stepGen) stepGen.style.opacity = '1';
+            } else if (seconds < 60) {
+                if (loadingStatus) loadingStatus.textContent = 'جاري كتابة الكود والتصميم...';
+                if (stepGen) stepGen.innerHTML = '<i class="fa-solid fa-check" style="margin-left: 8px; color: #10b981;"></i> تم تجهيز المحتوى';
+                if (stepGen) stepGen.style.opacity = '1';
+                if (stepCode) stepCode.style.opacity = '1';
+            } else if (seconds < 120) {
+                if (loadingStatus) loadingStatus.textContent = 'جاري تحسين واجهة المستخدم...';
+                if (stepCode) stepCode.innerHTML = '<i class="fa-solid fa-check" style="margin-left: 8px; color: #10b981;"></i> تم كتابة الأكواد';
+                if (stepCode) stepCode.style.opacity = '1';
+                if (stepDeploy) stepDeploy.style.opacity = '1';
+            } else {
+                if (loadingStatus) loadingStatus.textContent = 'جاري النشر النهائي...';
+                if (stepDeploy) stepDeploy.style.opacity = '1';
+            }
+        };
 
         const pollInterval = setInterval(async () => {
             elapsed += 5;
+            updateSteps(elapsed);
 
             if (elapsed >= maxWait) {
                 clearInterval(pollInterval);
                 localStorage.removeItem('wb_active_job');
-                if (window.showNotification) showNotification("⚠️ استغرقت العملية وقتاً طويلاً جداً. يرجى التحقق لاحقاً.", "error");
+                updateWBSidebarIndicator(false);
+                if (window.showToast) showToast("⚠️ استغرقت العملية وقتاً طويلاً جداً. يرجى التحقق لاحقاً.", "error");
+                else alert("⚠️ استغرقت العملية وقتاً طويلاً جداً. يرجى التحقق لاحقاً.");
                 return;
             }
 
@@ -707,8 +757,9 @@ function initWebsiteBuilderLogic() {
                 if (status.status === 'done') {
                     clearInterval(pollInterval);
                     localStorage.removeItem('wb_active_job');
+                    updateWBSidebarIndicator(false);
                     
-                    if (window.showNotification) showNotification("✅ اكتمل بناء موقعك بنجاح!", "success");
+                    if (window.showToast) showToast("✅ اكتمل بناء موقعك بنجاح!", "success");
 
                     // فتح المودال تلقائياً وإظهار النتيجة
                     const resultModal = document.getElementById('websiteBuilderModal');
@@ -734,8 +785,9 @@ function initWebsiteBuilderLogic() {
                 } else if (status.status === 'error') {
                     clearInterval(pollInterval);
                     localStorage.removeItem('wb_active_job');
+                    updateWBSidebarIndicator(false);
                     
-                    if (window.showNotification) showNotification(`❌ فشل بناء الموقع: ${status.message}`, "error");
+                    if (window.showToast) showToast(`❌ فشل بناء الموقع: ${status.message}`, "error");
                     
                     // إظهار الخطأ في المودال لو كان مفتوحاً
                     const modalEl = document.getElementById('websiteBuilderModal');
@@ -744,6 +796,11 @@ function initWebsiteBuilderLogic() {
                         document.getElementById('wb-loading').style.display = 'none';
                         if (submitBtn) submitBtn.disabled = false;
                     }
+                } else if (status.status === 'not_found') {
+                    clearInterval(pollInterval);
+                    localStorage.removeItem('wb_active_job');
+                    updateWBSidebarIndicator(false);
+                    console.warn("Job not found on server, stopping poll.");
                 }
             } catch (pollErr) {
                 console.warn('Polling error:', pollErr.message);

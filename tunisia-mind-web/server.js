@@ -11,6 +11,7 @@ const path = require('path');
 const sharp = require('sharp');
 const { searchKnowledgeBase } = require('./knowledge');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const fs = require('fs');
 
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 // حماية الخادم من التوقف المفاجئ (Anti-Crash)
@@ -520,7 +521,7 @@ app.post('/api/generate-image', async (req, res) => {
         // Wake up the forge server
         try { await fetch(forgeUrl + '/', { signal: AbortSignal.timeout(3000) }); } catch (_) { }
 
-        const response = await fetch(`${forgeUrl}/api/v1/images`, {
+        const response = await fetch(`${forgeUrl}/generate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -528,18 +529,17 @@ app.post('/api/generate-image', async (req, res) => {
             },
             body: JSON.stringify({
                 prompt: englishPrompt,
-                response_format: 'base64',
-                aspect_ratio: '1:1'
+                response_format: 'base64'
             }),
             signal: AbortSignal.timeout(60000)
         });
 
         const data = await response.json().catch(() => null);
-        console.log(`📥 Forge API Response [${response.status}]:`, data ? Object.keys(data) : "Not JSON");
+        console.log(`📥 Forge Image Response [${response.status}]:`, data ? Object.keys(data) : "Not JSON");
 
         if (!response.ok) {
-            console.error(`Forge API failed [${response.status}]:`, data);
-            throw new Error(data?.error || `Forge API returned ${response.status}`);
+            console.error(`Forge Image failed [${response.status}]:`, data);
+            throw new Error(data?.error || `API returned ${response.status}`);
         }
 
         const base64Data = data?.image_b64;
@@ -630,13 +630,58 @@ function generateSlug(text) {
 // ==========================================
 // نظام النشر غير المتزامن (Async Job System)
 // ==========================================
-const publishJobs = {}; // مخزن مؤقت للوظائف في الذاكرة
+const JOBS_FILE = path.join(__dirname, 'jobs.json');
+
+function loadJobs() {
+    try {
+        if (fs.existsSync(JOBS_FILE)) {
+            const data = fs.readFileSync(JOBS_FILE, 'utf8');
+            return JSON.parse(data);
+        }
+    } catch (e) {
+        console.error('Error loading jobs:', e);
+    }
+    return {};
+}
+
+function saveJobs(jobs) {
+    try {
+        // Clean up old jobs before saving (older than 24 hours)
+        const now = Date.now();
+        const oneDay = 24 * 60 * 60 * 1000;
+        const cleanedJobs = {};
+        Object.keys(jobs).forEach(id => {
+            if (now - (jobs[id].createdAt || 0) < oneDay) {
+                cleanedJobs[id] = jobs[id];
+            }
+        });
+        fs.writeFileSync(JOBS_FILE, JSON.stringify(cleanedJobs, null, 2));
+        return cleanedJobs;
+    } catch (e) {
+        console.error('Error saving jobs:', e);
+        return jobs;
+    }
+}
+
+let publishJobs = loadJobs(); // مخزن للوظائف
+
+// تنظيف الوظائف العالقة عند بدء التشغيل (إذا توقف السيرفر فجأة)
+Object.keys(publishJobs).forEach(id => {
+    if (publishJobs[id].status === 'processing') {
+        publishJobs[id].status = 'error';
+        publishJobs[id].message = 'فشلت العملية بسبب إعادة تشغيل المخدم. يرجى المحاولة مرة أخرى.';
+    }
+});
+publishJobs = saveJobs(publishJobs);
 
 app.post('/api/publish-website', async (req, res) => {
     const deployApiKey = process.env.DEPLOY_API_KEY || '93793389y';
     const publishUrl = process.env.PUBLISH_WEBSITE_URL || 'https://eucunfvrwxeairwkdqwg.supabase.co/functions/v1/deploy-site';
 
     const payload = req.body;
+    if (!payload || !payload.prompt) {
+        return res.status(400).json({ success: false, message: 'الرجاء تقديم وصف (Prompt) للموقع.' });
+    }
 
     // توليد slug تلقائياً إن لم يُرسَل أو كان غير صالح
     if (!payload.slug || !/^[a-z0-9][a-z0-9-]{1,61}$/.test(payload.slug)) {
@@ -646,65 +691,89 @@ app.post('/api/publish-website', async (req, res) => {
     // إنشاء job_id فوري والرد على العميل قبل انتهاء مهلة Render (30 ثانية)
     const jobId = 'pub_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
     publishJobs[jobId] = { status: 'processing', slug: payload.slug, createdAt: Date.now() };
+    publishJobs = saveJobs(publishJobs);
     res.json({ success: true, status: 'processing', job_id: jobId, slug: payload.slug });
 
     // المعالجة في الخلفية بدون تقييد مهلة Render
     (async () => {
-        try {
-            console.log(`📤 [JOB ${jobId}] Publishing slug: ${payload.slug} (External Generation)`);
+        let attempts = 0;
+        const maxAttempts = 3;
+        let lastError = null;
 
-            const response = await fetch(publishUrl, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json', 
-                    'x-deploy-key': deployApiKey 
-                },
-                body: JSON.stringify({
-                    ...payload,
-                    language: 'ar',
-                    brand_badge: true
-                }),
-                signal: AbortSignal.timeout(600000) // رفع المهلة إلى 10 دقائق
-            });
+        // ترجمة النص إلى الإنجليزية لتسريع التوليد وتقليل أخطاء خادم Supabase
+        const englishPrompt = await translatePromptToEnglish(payload.prompt);
 
-            const contentType = response.headers.get('content-type') || '';
-            if (!contentType.includes('application/json')) {
-                const rawText = await response.text();
-                console.error(`[JOB ${jobId}] Non-JSON Response (${response.status}):`, rawText.slice(0, 500));
-                publishJobs[jobId] = { 
-                    status: 'error', 
-                    message: `خادم النشر أرجع خطأ تقني (${response.status}). يرجى التأكد من الـ Prompt أو المحاولة لاحقاً.` 
+        while (attempts < maxAttempts) {
+            try {
+                if (attempts > 0) {
+                    console.log(`🔄 [JOB ${jobId}] Retrying... attempt ${attempts + 1}`);
+                    await new Promise(r => setTimeout(r, 5000)); // Wait 5s between retries
+                }
+
+                const response = await fetch(publishUrl, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json', 
+                        'x-deploy-key': deployApiKey 
+                    },
+                    body: JSON.stringify({
+                        ...payload,
+                        prompt: englishPrompt, // استخدام النص المترجم
+                        language: 'ar',
+                        brand_badge: true
+                    }),
+                    signal: AbortSignal.timeout(600000) // 10 minutes timeout
+                });
+
+                const contentType = response.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) {
+                    const rawText = await response.text();
+                    throw new Error(`خادم النشر أرجع استجابة غير صالحة (${response.status})`);
+                }
+
+                const data = await response.json();
+                console.log(`📥 [JOB ${jobId}] Response (${response.status}):`, JSON.stringify(data).slice(0, 200));
+
+                if (!response.ok) {
+                    const errorMsg = data.error || data.message || `خطأ من خادم النشر (${response.status})`;
+                    // If it's a temporary server error, retry
+                    if (response.status >= 500 && attempts < maxAttempts - 1) {
+                        throw new Error(errorMsg);
+                    }
+                    
+                    publishJobs[jobId] = { status: 'error', message: errorMsg, createdAt: publishJobs[jobId].createdAt };
+                    publishJobs = saveJobs(publishJobs);
+                    return;
+                }
+
+                publishJobs[jobId] = {
+                    status: 'done',
+                    message: data.message || 'تم إنشاء الموقع بنجاح! 🎉',
+                    direct_url: data.direct_url || data.url || `https://publishwebsitetunisiaindai.lovable.app/sites/${payload.slug}`,
+                    slug: payload.slug,
+                    createdAt: publishJobs[jobId].createdAt
                 };
-                return;
+                publishJobs = saveJobs(publishJobs);
+                return; // Success!
+
+            } catch (e) {
+                attempts++;
+                lastError = e;
+                console.error(`⚠️ [JOB ${jobId}] Attempt ${attempts} failed:`, e.message);
+                
+                if (attempts >= maxAttempts) {
+                    let userFriendlyMsg = 'فشل الاتصال بخادم النشر الخارجي بعد عدة محاولات.';
+                    if (e.name === 'TimeoutError') userFriendlyMsg = 'استغرقت العملية وقتاً طويلاً جداً (أكثر من 10 دقائق).';
+                    
+                    publishJobs[jobId] = { 
+                        status: 'error', 
+                        message: `${userFriendlyMsg} (التفاصيل: ${e.message})`,
+                        createdAt: publishJobs[jobId].createdAt
+                    };
+                    publishJobs = saveJobs(publishJobs);
+                }
             }
-
-            const data = await response.json();
-            console.log(`📥 [JOB ${jobId}] Response (${response.status}):`, JSON.stringify(data).slice(0, 200));
-
-            if (!response.ok) {
-                const errorMsg = data.error || data.message || `خطأ من خادم النشر (${response.status})`;
-                publishJobs[jobId] = { status: 'error', message: errorMsg };
-                return;
-            }
-
-            publishJobs[jobId] = {
-                status: 'done',
-                message: data.message || 'تم إنشاء الموقع بنجاح! 🎉',
-                direct_url: data.direct_url || data.url || `https://publishwebsitetunisiaindai.lovable.app/sites/${payload.slug}`,
-                slug: payload.slug
-            };
-        } catch (e) {
-            console.error(`❌ [JOB ${jobId}] Fatal Error:`, e.message);
-            let userFriendlyMsg = 'فشل الاتصال بخادم النشر الخارجي.';
-            if (e.name === 'TimeoutError') userFriendlyMsg = 'استغرقت عملية بناء الموقع وقتاً طويلاً جداً (أكثر من 10 دقائق).';
-            
-            publishJobs[jobId] = { status: 'error', message: `${userFriendlyMsg} (التفاصيل: ${e.message})` };
         }
-        // تنظيف الوظائف القديمة (+1 ساعة)
-        const oneHour = 3600000;
-        Object.keys(publishJobs).forEach(id => {
-            if (Date.now() - (publishJobs[id].createdAt || 0) > oneHour) delete publishJobs[id];
-        });
     })();
 });
 

@@ -126,9 +126,11 @@
                 </button>
                 <div class="header-center">
                     <div class="header-logo-wrap" id="headerLogoWrap">
-                        <img id="siteLogo" src="assets/app-logo.jpg" alt="Logo"
-                            style="display:block; height: 32px; margin-inline-end: 10px; border-radius: 50%;"
-                            onerror="this.style.display='none'">
+                        <div class="premium-logo-frame header-logo-frame">
+                            <img id="siteLogo" src="assets/app-logo.jpg" alt="Logo"
+                                style="display:block; width: 100%; height: 100%; object-fit: cover;"
+                                onerror="this.style.display='none'">
+                        </div>
                         <span class="logo-emoji" id="logoEmoji" style="font-size: 1.5rem; display: none;">🧠</span>
                     </div>
                     <span class="brand-name" id="currentChatTitle" data-i18n="brand_name">MindTY</span>
@@ -157,9 +159,11 @@
                 <div class="welcome-screen" id="welcomeScreen">
                     <div class="welcome-inner">
                         <div class="brand-logo">
-                            <img id="welcomeLogo" src="assets/tunisia-brain-new.jpg"
-                                style="width: 100px; height: 100px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.3);"
-                                onerror="this.outerHTML='<div style=\'font-size:70px;width:100px;height:100px;display:flex;align-items:center;justify-content:center;background:var(--bg-tertiary);border-radius:20px;\'>🧠</div>'">
+                            <div class="premium-logo-frame welcome-logo-frame">
+                                <img id="welcomeLogo" src="assets/tunisia-brain-new.jpg"
+                                    style="width: 100%; height: 100%; object-fit: cover;"
+                                    onerror="this.outerHTML='<div style=\'font-size:70px;width:100px;height:100px;display:flex;align-items:center;justify-content:center;background:var(--bg-tertiary);border-radius:18px;\'>🧠</div>'">
+                            </div>
                         </div>
                         <h1 id="welcomeTitle" data-i18n="welcome_title">كيف يمكنني مساعدتك اليوم؟</h1>
                         <p class="welcome-sub" id="welcomeSub" data-i18n="welcome_sub">اسألني أي شيء، اطلب كوداً، أو ابدأ محادثة</p>
@@ -582,8 +586,21 @@
                     <i class="fa-solid fa-rocket"></i> <span>تنفيذ الطلب</span>
                 </button>
                 <div id="wb-loading" style="display: none; text-align: center; margin-top: 20px;">
-                    <div class="loader" style="border: 3px solid rgba(16, 185, 129, 0.3); border-top: 3px solid #10b981; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px;"></div>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem;">جاري معالجة طلبك، قد يستغرق هذا بضع ثوانٍ...</p>
+                    <div class="loader-wrapper" style="position: relative; width: 60px; height: 60px; margin: 0 auto 15px;">
+                        <div class="loader" style="border: 4px solid rgba(16, 185, 129, 0.1); border-top: 4px solid #10b981; border-radius: 50%; width: 100%; height: 100%; animation: spin 1s linear infinite;"></div>
+                        <i class="fa-solid fa-wand-magic-sparkles" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #0ea5e9; font-size: 1.2rem;"></i>
+                    </div>
+                    <p id="wb-loading-status" style="color: var(--text-primary); font-weight: 600; margin-bottom: 5px;">جاري إرسال الطلب...</p>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; line-height: 1.4;">
+                        هذه العملية تتضمن كتابة الأكواد وتصميم الموقع بالذكاء الاصطناعي.<br>
+                        <span style="color: var(--accent-color);">قد تستغرق من 1 إلى 5 دقائق.</span>
+                    </p>
+                    
+                    <div class="wb-progress-steps" style="margin-top: 20px; text-align: right; font-size: 0.85rem; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                        <div id="step-gen" class="wb-step" style="opacity: 0.5; margin-bottom: 8px;"><i class="fa-solid fa-circle-notch fa-spin" style="margin-left: 8px;"></i> جاري توليد المحتوى والتصميم...</div>
+                        <div id="step-code" class="wb-step" style="opacity: 0.5; margin-bottom: 8px;"><i class="fa-solid fa-code" style="margin-left: 8px;"></i> برمجة ملفات HTML و CSS...</div>
+                        <div id="step-deploy" class="wb-step" style="opacity: 0.5;"><i class="fa-solid fa-cloud-arrow-up" style="margin-left: 8px;"></i> جاري النشر على السحابة...</div>
+                    </div>
                 </div>
                 <style>
                     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
