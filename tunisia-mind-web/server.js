@@ -170,8 +170,7 @@ async function fetchWeatherData(lat, lon) {
 async function executeTool(toolCall) {
     const fnName = toolCall.function.name;
     const args = JSON.parse(toolCall.function.arguments || '{}');
-
-
+    if (fnName === 'get_current_time') {
         return "التوقيت الحالي في تونس هو: " + new Date().toLocaleString('ar-TN', { timeZone: 'Africa/Tunis' });
     } else if (fnName === 'get_weather') {
         try {
