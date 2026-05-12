@@ -96,9 +96,7 @@ const SYSTEM_PROMPT = `
 - للبيانات: استخدم جداول Markdown. إذا طلب المستخدم رسماً بيانياً، أرجع كتلة كود بالصيغة \`chart:json\` تحتوي على إعدادات Chart.js صالحة.
 
 ### 5. الميزات الخاصة (اذكرها فقط إذا سأل المستخدم صراحةً):
-- بناء المواقع: قل للمستخدم أن يفتح الشريط الجانبي ويضغط على "مواقع بالذكاء الاصطناعي".
 - توليد الصور: قل للمستخدم أن يبدأ رسالته بكلمة "ارسم".
-- البحث في الإنترنت: قل للمستخدم أن يبدأ رسالته بكلمة "ابحث".
 - البريد الإلكتروني للدعم التقني: tunisiamindai@gmail.com (اذكره فقط إذا سُئلت).
 
 ### 6. الاختصار والدقة:
@@ -173,10 +171,7 @@ async function executeTool(toolCall) {
     const fnName = toolCall.function.name;
     const args = JSON.parse(toolCall.function.arguments || '{}');
 
-    if (fnName === 'search_wikipedia') {
-        const res = await performWebSearch(args.query);
-        return res || "لم يتم العثور على أية نتائج مطابقة.";
-    } else if (fnName === 'get_current_time') {
+
         return "التوقيت الحالي في تونس هو: " + new Date().toLocaleString('ar-TN', { timeZone: 'Africa/Tunis' });
     } else if (fnName === 'get_weather') {
         try {
@@ -207,8 +202,7 @@ ${w.emoji} الحالة: ${w.condition}
             vm.runInContext(args.code, sandbox, { timeout: 2000 });
             return `نتيجة التنفيذ:\n${sandbox.output || "لا يوجد مخرجات نصية"}`;
         } catch (e) { return `خطأ في التنفيذ: ${e.message}`; }
-    } else if (fnName === 'deep_web_search') {
-        return await performWebSearch(args.query);
+
     } else if (fnName === 'fetch_github_repo') {
         try {
             const res = await fetch(`https://api.github.com/repos/${args.repo}/git/trees/main?recursive=1`);
@@ -371,84 +365,12 @@ async function streamAIResponse(messages, res, responseLen) {
     }
 }
 
-async function performWebSearch(query) {
-    const apiKey = 'dsr_live_88c91f8c02a72aee5b103c2091cf035ae2238a5d685b2a33';
-    const baseUrl = 'https://intelligent-retrieval-system--yben64993.replit.app';
-    const searchUrl = `${baseUrl}/api/search`;
 
-    // Wake up the search server (non-blocking)
-    fetch(baseUrl + '/', { signal: AbortSignal.timeout(3000) }).catch(() => { });
-
-    try {
-        const res = await fetch(searchUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({ query: query, message: query }), // Support both query/message keys
-            signal: AbortSignal.timeout(25000)
-        });
-
-        if (!res.ok) throw new Error(`Search API returned ${res.status}`);
-        const data = await res.json();
-        console.log("🔍 Search API Response:", JSON.stringify(data).slice(0, 200));
-
-        // Support various common Replit output formats
-        const answer = data.answer || data.response || data.output || data.result;
-        if (answer) {
-            return answer;
-        }
-
-        if (data.results && data.results.length > 0) {
-            let context = "نتائج البحث في الإنترنت:\n";
-            data.results.slice(0, 3).forEach(r => {
-                context += `- ${r.title}: ${r.content || r.snippet}\n`;
-            });
-            return context;
-        }
-    } catch (e) {
-        console.error("Search API Error:", e.message);
-    }
-
-    // Fallback to Wikipedia if custom system fails
-    try {
-        const wikiUrl = `https://ar.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json`;
-        const res = await fetch(wikiUrl);
-        const data = await res.json();
-        if (data?.query?.search?.length > 0) {
-            let context = "\n\n(معلومات من ويكيبيديا):\n";
-            data.query.search.slice(0, 3).forEach(r => {
-                context += `- **${r.title}**: ${r.snippet.replace(/<\/?[^>]+(>|$)/g, "")}\n`;
-            });
-            return context;
-        }
-    } catch (e) { console.error("Wikipedia fallback error:", e.message); }
-    return null;
-}
 
 app.post('/api/chat', async (req, res) => {
     const { prompt, userContext, history, stream, responseLen, image } = req.body;
 
-    // Auto-detect search intent (stricter keywords to prevent slow searches on normal questions)
-    const searchKeywords = ['ابحث', 'بحث', 'نتائج', 'اخبار', 'أخبار', 'search the web', 'search internet', 'اخر اخبار'];
-    const needsSearch = searchKeywords.some(k => prompt?.toLowerCase().includes(k));
 
-    if (needsSearch && !image) {
-        console.log(`🔍 Routing to Search Retrieval System: ${prompt}`);
-        const searchResult = await performWebSearch(prompt);
-        if (searchResult) {
-            const cleanResult = searchResult.replace('(نتائج البحث في الإنترنت):', '').replace('(معلومات من ويكيبيديا):', '').trim();
-            if (stream) {
-                res.setHeader('Content-Type', 'text/event-stream');
-                res.write(`data: ${JSON.stringify({ content: cleanResult })}\n\n`);
-                res.write('data: [DONE]\n\n');
-                return res.end();
-            }
-            return res.json({ answer: cleanResult, source: 'search' });
-        }
-    }
 
     const kbAnswer = searchKnowledgeBase(prompt);
     if (!stream && kbAnswer) return res.json({ answer: kbAnswer, source: 'knowledge-base' });
@@ -601,258 +523,19 @@ app.get('/api/weather', async (req, res) => {
     } catch (err) { res.status(500).json({ error: 'Weather error' }); }
 });
 
-// دالة مساعدة: توليد slug صالح من النص
-function generateSlug(text) {
-    // تحويل النص العربي/الإنجليزي إلى slug إنجليزي بسيط
-    const words = [
-        'site', 'page', 'web', 'project', 'app', 'portal', 'hub', 'space', 'zone', 'world'
-    ];
-    const randomWord = words[Math.floor(Math.random() * words.length)];
-    const timestamp = Date.now().toString(36).slice(-4); // 4 random chars from timestamp
-    let base = 'tunisian-' + randomWord + '-' + timestamp;
-
-    // إذا كان النص إنجليزياً، استخدمه كأساس
-    if (text && /[a-zA-Z]/.test(text)) {
-        base = text
-            .toLowerCase()
-            .replace(/[^a-z0-9\s-]/g, '')
-            .trim()
-            .replace(/\s+/g, '-')
-            .replace(/-+/g, '-')
-            .slice(0, 40);
-        if (base.length < 3) base = 'tunisian-' + randomWord + '-' + timestamp;
-        else base = base + '-' + timestamp;
-    }
-
-    return base.slice(0, 62);
-}
 
 // ==========================================
-// نظام النشر غير المتزامن (Async Job System)
+// 🚀 بدء تشغيل الخادم
 // ==========================================
-const JOBS_FILE = path.join(__dirname, 'jobs.json');
-
-function loadJobs() {
-    try {
-        if (fs.existsSync(JOBS_FILE)) {
-            const data = fs.readFileSync(JOBS_FILE, 'utf8');
-            return JSON.parse(data);
-        }
-    } catch (e) {
-        console.error('Error loading jobs:', e);
-    }
-    return {};
-}
-
-function saveJobs(jobs) {
-    try {
-        // Clean up old jobs before saving (older than 24 hours)
-        const now = Date.now();
-        const oneDay = 24 * 60 * 60 * 1000;
-        const cleanedJobs = {};
-        Object.keys(jobs).forEach(id => {
-            if (now - (jobs[id].createdAt || 0) < oneDay) {
-                cleanedJobs[id] = jobs[id];
-            }
-        });
-        fs.writeFileSync(JOBS_FILE, JSON.stringify(cleanedJobs, null, 2));
-        return cleanedJobs;
-    } catch (e) {
-        console.error('Error saving jobs:', e);
-        return jobs;
-    }
-}
-
-let publishJobs = loadJobs(); // مخزن للوظائف
-
-// تنظيف الوظائف العالقة عند بدء التشغيل (إذا توقف السيرفر فجأة)
-Object.keys(publishJobs).forEach(id => {
-    if (publishJobs[id].status === 'processing') {
-        publishJobs[id].status = 'error';
-        publishJobs[id].message = 'فشلت العملية بسبب إعادة تشغيل المخدم. يرجى المحاولة مرة أخرى.';
-    }
-});
-publishJobs = saveJobs(publishJobs);
-
-app.post('/api/publish-website', async (req, res) => {
-    const deployApiKey = process.env.DEPLOY_API_KEY || '93793389y';
-    const publishUrl = process.env.PUBLISH_WEBSITE_URL || 'https://eucunfvrwxeairwkdqwg.supabase.co/functions/v1/deploy-site';
-
-    const payload = req.body;
-    if (!payload || !payload.prompt) {
-        return res.status(400).json({ success: false, message: 'الرجاء تقديم وصف (Prompt) للموقع.' });
-    }
-
-    // توليد slug تلقائياً إن لم يُرسَل أو كان غير صالح
-    if (!payload.slug || !/^[a-z0-9][a-z0-9-]{1,61}$/.test(payload.slug)) {
-        payload.slug = generateSlug(payload.prompt || '');
-    }
-
-    // إنشاء job_id فوري والرد على العميل قبل انتهاء مهلة Render (30 ثانية)
-    const jobId = 'pub_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-    publishJobs[jobId] = { status: 'processing', slug: payload.slug, createdAt: Date.now() };
-    publishJobs = saveJobs(publishJobs);
-    res.json({ success: true, status: 'processing', job_id: jobId, slug: payload.slug });
-
-    // المعالجة في الخلفية بدون تقييد مهلة Render
-    (async () => {
-        let attempts = 0;
-        const maxAttempts = 3;
-        let lastError = null;
-
-        // ترجمة النص إلى الإنجليزية لتسريع التوليد وتقليل أخطاء خادم Supabase
-        const englishPrompt = await translatePromptToEnglish(payload.prompt);
-
-        while (attempts < maxAttempts) {
-            try {
-                if (attempts > 0) {
-                    console.log(`🔄 [JOB ${jobId}] Retrying... attempt ${attempts + 1}`);
-                    await new Promise(r => setTimeout(r, 5000)); // Wait 5s between retries
-                }
-
-                const response = await fetch(publishUrl, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json', 
-                        'x-deploy-key': deployApiKey 
-                    },
-                    body: JSON.stringify({
-                        ...payload,
-                        prompt: englishPrompt, // استخدام النص المترجم
-                        language: 'ar',
-                        brand_badge: true
-                    }),
-                    signal: AbortSignal.timeout(600000) // 10 minutes timeout
-                });
-
-                const contentType = response.headers.get('content-type') || '';
-                if (!contentType.includes('application/json')) {
-                    const rawText = await response.text();
-                    throw new Error(`خادم النشر أرجع استجابة غير صالحة (${response.status})`);
-                }
-
-                const data = await response.json();
-                console.log(`📥 [JOB ${jobId}] Response (${response.status}):`, JSON.stringify(data).slice(0, 200));
-
-                if (!response.ok) {
-                    const errorMsg = data.error || data.message || `خطأ من خادم النشر (${response.status})`;
-                    // If it's a temporary server error, retry
-                    if (response.status >= 500 && attempts < maxAttempts - 1) {
-                        throw new Error(errorMsg);
-                    }
-                    
-                    publishJobs[jobId] = { status: 'error', message: errorMsg, createdAt: publishJobs[jobId].createdAt };
-                    publishJobs = saveJobs(publishJobs);
-                    return;
-                }
-
-                publishJobs[jobId] = {
-                    status: 'done',
-                    message: data.message || 'تم إنشاء الموقع بنجاح! 🎉',
-                    direct_url: data.direct_url || data.url || `https://publishwebsitetunisiaindai.lovable.app/sites/${payload.slug}`,
-                    slug: payload.slug,
-                    createdAt: publishJobs[jobId].createdAt
-                };
-                publishJobs = saveJobs(publishJobs);
-                return; // Success!
-
-            } catch (e) {
-                attempts++;
-                lastError = e;
-                console.error(`⚠️ [JOB ${jobId}] Attempt ${attempts} failed:`, e.message);
-                
-                if (attempts >= maxAttempts) {
-                    let userFriendlyMsg = 'فشل الاتصال بخادم النشر الخارجي بعد عدة محاولات.';
-                    if (e.name === 'TimeoutError') userFriendlyMsg = 'استغرقت العملية وقتاً طويلاً جداً (أكثر من 10 دقائق).';
-                    
-                    publishJobs[jobId] = { 
-                        status: 'error', 
-                        message: `${userFriendlyMsg} (التفاصيل: ${e.message})`,
-                        createdAt: publishJobs[jobId].createdAt
-                    };
-                    publishJobs = saveJobs(publishJobs);
-                }
-            }
-        }
-    })();
+app.get(/.*/, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'), { etag: false });
 });
 
-// الاستعلام عن حالة وظيفة النشر
-app.get('/api/publish-status/:jobId', (req, res) => {
-    const job = publishJobs[req.params.jobId];
-    if (!job) return res.json({ status: 'not_found', message: 'الوظيفة غير موجودة أو انتهت.' });
-    res.json(job);
-});
-
-// ==========================================
-// 🌐 عرض المواقع المنشورة عبر /site/:slug
-// يجلب الموقع من Supabase ويعرضه كـ HTML مُصيَّر
-// ==========================================
-app.get('/site/:slug', async (req, res) => {
-    const { slug } = req.params;
-    const supabaseServeUrl = process.env.SUPABASE_SERVE_URL ||
-        'https://eucunfvrwxeairwkdqwg.supabase.co/functions/v1/serve-site';
-
-    try {
-        const response = await fetch(`${supabaseServeUrl}/${encodeURIComponent(slug)}`, {
-            headers: { 'Accept': 'text/html,application/xhtml+xml,*/*' },
-            signal: AbortSignal.timeout(15000)
-        });
-
-        if (!response.ok) {
-            return res.status(response.status).send(`
-                <!DOCTYPE html><html lang="ar" dir="rtl">
-                <head><meta charset="UTF-8"><title>خطأ</title>
-                <style>body{font-family:Arial,sans-serif;text-align:center;padding:60px;background:#0f0f0f;color:#fff;}
-                h1{color:#ef4444;}a{color:#7c3aed;text-decoration:none;}</style></head>
-                <body><h1>⚠️ الموقع غير موجود</h1>
-                <p>لم يتم العثور على الموقع: <strong>${slug}</strong></p>
-                <a href="/">← العودة للتطبيق</a></body></html>
-            `);
-        }
-
-        const buffer = await response.arrayBuffer();
-        const body = Buffer.from(buffer).toString('utf-8');
-
-        // ضبط headers صحيحة لضمان عرض HTML بشكل صحيح وبترميز UTF-8
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('X-Frame-Options', 'ALLOWALL');
-        res.send(body);
-
-    } catch (e) {
-        console.error(`Site serve error [${slug}]:`, e.message);
-        res.status(502).send(`
-            <!DOCTYPE html><html lang="ar" dir="rtl">
-            <head><meta charset="UTF-8"><title>خطأ في الاتصال</title>
-            <style>body{font-family:Arial,sans-serif;text-align:center;padding:60px;background:#0f0f0f;color:#fff;}
-            h1{color:#ef4444;}a{color:#7c3aed;text-decoration:none;}</style></head>
-            <body><h1>⚠️ تعذّر تحميل الموقع</h1>
-            <p>حدث خطأ أثناء الاتصال بخادم المواقع. حاول مرة أخرى.</p>
-            <a href="/">← العودة للتطبيق</a></body></html>
-        `);
-    }
-});
-
-// route للمسارات الفرعية داخل الموقع المنشور (مثل /site/my-site/about)
-app.get(/^\/site\/([^\/]+)\/(.*)/, async (req, res) => {
-    const slug = req.params[0];
-    const subPath = req.params[1] || '';
-    const supabaseServeUrl = process.env.SUPABASE_SERVE_URL ||
-        'https://eucunfvrwxeairwkdqwg.supabase.co/functions/v1/serve-site';
-
-    try {
-        const response = await fetch(`${supabaseServeUrl}/${encodeURIComponent(slug)}/${subPath}`, {
-            signal: AbortSignal.timeout(15000)
-        });
-
-        const contentType = response.headers.get('content-type') || 'text/html';
-        const body = await response.arrayBuffer();
-
-        res.setHeader('Content-Type', contentType.includes('text/html') ? 'text/html; charset=utf-8' : contentType);
-        res.send(Buffer.from(body));
-    } catch (e) {
-        res.redirect(`/site/${slug}`);
-    }
+app.listen(PORT, () => {
+    console.log(`🚀 MindTY Server running on http://localhost:${PORT}`);
 });
 
 app.get(/.*/, (req, res) => {

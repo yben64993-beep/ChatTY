@@ -132,8 +132,7 @@ const translations = {
         thinking: "يفكر...",
         saved_images: "الصور المحفوظة",
         welcome_discover: "مرحباً! انقر لرؤية مميزات الموقع الجديدة 🚀",
-        website_builder: "صانع المواقع الذكي",
-        ai_websites: "مواقع بالذكاء الاصطناعي",
+
         your_id: "معرّفك",
         id_note: " هذا معرّفك الفريد، يُستخدم عند التواصل مع الدعم.",
         guest_login: "الدخول كضيف",
@@ -274,8 +273,7 @@ const translations = {
         thinking: "Thinking...",
         saved_images: "Saved Images",
         welcome_discover: "Hello! Click to see new features 🚀",
-        website_builder: "Smart Website Builder",
-        ai_websites: "AI Websites",
+
         your_id: "Your ID",
         id_note: " This is your unique ID, used when contacting support.",
         guest_login: "Guest Login",
@@ -367,8 +365,7 @@ const translations = {
         back_to_chat: "← Retour au chat",
         saved_images: "Images Enregistrées",
         welcome_discover: "Bonjour! Cliquez pour voir les nouveautés 🚀",
-        website_builder: "Créateur de sites intelligent",
-        ai_websites: "Sites IA",
+
         your_id: "Votre ID",
         id_note: " Votre identifiant unique, utilisé pour contacter le support.",
         guest_login: "Accès Invité",
@@ -501,8 +498,7 @@ const translations = {
         thinking: "Pensando...",
         saved_images: "Imágenes guardadas",
         welcome_discover: "¡Hola! Haz clic para ver novedades 🚀",
-        website_builder: "Constructor de sitios inteligente",
-        ai_websites: "Sitios IA",
+
         your_id: "Tu ID",
         id_note: " Este es tu ID único para soporte.",
         guest_login: "Acceso de invitado"
@@ -631,8 +627,7 @@ const translations = {
         thinking: "Denkt nach...",
         saved_images: "Gespeicherte Bilder",
         welcome_discover: "Hallo! Klicke für Neuigkeiten 🚀",
-        website_builder: "Intelligenter Website-Builder",
-        ai_websites: "KI-Websites",
+
         your_id: "Deine ID",
         id_note: " Dies ist deine eindeutige Support-ID.",
         guest_login: "Gast-Login"
@@ -761,8 +756,7 @@ const translations = {
         thinking: "Riflessione...",
         saved_images: "Immagini salvate",
         welcome_discover: "Ciao! Clicca per vedere le novità 🚀",
-        website_builder: "Costruttore di siti intelligente",
-        ai_websites: "Siti AI",
+
         your_id: "Tuo ID",
         id_note: " Questo è il tuo ID univoco per il supporto.",
         guest_login: "Accesso ospite"
@@ -891,8 +885,7 @@ const translations = {
         thinking: "Pensando...",
         saved_images: "Imagens Salvas",
         welcome_discover: "Olá! Clique para ver novidades 🚀",
-        website_builder: "Construtor de Sites Inteligente",
-        ai_websites: "Sites IA",
+
         your_id: "Seu ID",
         id_note: " Este é seu ID exclusivo para suporte.",
         guest_login: "Login de Convidado"
@@ -1021,8 +1014,7 @@ const translations = {
         thinking: "Думаю...",
         saved_images: "Сохраненные изображения",
         welcome_discover: "Привет! Нажмите, чтобы увидеть новинки 🚀",
-        website_builder: "Умный конструктор сайтов",
-        ai_websites: "Сайты на ИИ",
+
         your_id: "Ваш ID",
         id_note: " Это ваш уникальный ID для поддержки.",
         guest_login: "Гостевой вход"
@@ -1151,8 +1143,7 @@ const translations = {
         thinking: "思考中...",
         saved_images: "已保存图片",
         welcome_discover: "您好！点击查看新功能 🚀",
-        website_builder: "智能网站生成器",
-        ai_websites: "AI 网站",
+
         your_id: "您的 ID",
         id_note: " 这是您的唯一支持 ID。",
         guest_login: "访客登录"
@@ -1281,8 +1272,7 @@ const translations = {
         thinking: "考え中...",
         saved_images: "保存された画像",
         welcome_discover: "こんにちは！新機能を見るにはクリック 🚀",
-        website_builder: "スマートウェブサイトビルダー",
-        ai_websites: "AIウェブサイト",
+
         your_id: "あなたのID",
         id_note: " これはサポート用の固有IDです。",
         guest_login: "ゲストログイン"
@@ -1411,8 +1401,7 @@ const translations = {
         thinking: "Düşünüyor...",
         saved_images: "Kaydedilen Resimler",
         welcome_discover: "Merhaba! Yenilikleri görmek için tıkla 🚀",
-        website_builder: "Akıllı Web Sitesi Oluşturucu",
-        ai_websites: "Yapay Zeka Siteleri",
+
         your_id: "ID'niz",
         id_note: " Bu, destek için benzersiz ID'nizdir.",
         guest_login: "Misafir Girişi"
