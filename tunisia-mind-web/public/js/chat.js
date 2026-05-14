@@ -917,59 +917,86 @@ window.runCode = (lang, code) => {
         return;
     }
 
-    runWindow.document.write('<html><head><title>تشغيل الكود - MindTY 🚀</title><meta charset="utf-8">');
-    runWindow.document.write('<style>body{margin:0; font-family:"Segoe UI", Tahoma, Geneva, Verdana, sans-serif; background:#1e1e1e; color:#ccc;} .app-header {background:#2d2d2d; padding:10px 20px; font-weight:bold; color:white; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center;}</style>');
-    runWindow.document.write('</head><body>');
+    // محاولة ذكية لاكتشاف اللغة إذا كانت غير معروفة
+    let detectedLang = lang.toLowerCase();
+    if (detectedLang === 'code' || !detectedLang) {
+        if (code.trim().startsWith('<')) detectedLang = 'html';
+        else if (code.includes('import ') || code.includes('def ')) detectedLang = 'python';
+        else if (code.includes('function') || code.includes('const ')) detectedLang = 'javascript';
+    }
 
-    // Header for the mock IDE window
-    runWindow.document.write('<div class="app-header"><span>بيئة التشغيل 💻</span><span style="color:#10b981; font-size:0.9rem;">يدعم ' + lang + '</span></div>');
+    runWindow.document.write(`
+    <html>
+    <head>
+        <title>MindTY Runtime - ${detectedLang.toUpperCase()}</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <style>
+            body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #f8fafc; overflow: hidden; }
+            .navbar { background: #1e293b; padding: 10px 20px; display: flex; justify-content: space-between; align-items:center; border-bottom: 1px solid #334155; }
+            .brand { font-weight: bold; color: #10b981; display: flex; align-items: center; gap: 10px; }
+            .lang-tag { background: #334155; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; text-transform: uppercase; }
+            .content-area { height: calc(100vh - 50px); overflow: auto; background: #fff; color: #000; }
+            .console-area { height: calc(100vh - 50px); overflow: auto; background: #000; color: #0f0; padding: 20px; font-family: 'Consolas', monospace; white-space: pre-wrap; }
+            .error-box { padding: 40px; text-align: center; color: #94a3b8; }
+            .error-icon { font-size: 4rem; color: #f59e0b; margin-bottom: 20px; }
+            .btn-copy { background: #10b981; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+        </style>
+    </head>
+    <body>
+        <div class="navbar">
+            <div class="brand"><i class="fa-solid fa-bolt"></i> MindTY Runtime</div>
+            <div class="lang-tag">${detectedLang}</div>
+        </div>
+    `);
 
-    if (lang === 'html' || lang === 'htm' || lang === 'xml') {
-        runWindow.document.write('<div style="padding:20px; background:white; color:black; height:calc(100vh - 40px); overflow:auto;">' + code + '</div>');
-    } else if (lang === 'css') {
-        runWindow.document.write(`<style>${code}</style><div style="padding:20px; text-align:center; padding-top:100px;"><h2>تم تطبيق الـ CSS! ✨</h2><p>هذه صفحة فارغة تم حقنها بالكود الخاص بك. أضف بعض الـ HTML لترى النتيجة النهائية.</p></div>`);
-    } else if (lang === 'js' || lang === 'javascript') {
-        runWindow.document.write(`<div id="consoleOut" style="padding:20px; font-family:monospace; white-space:pre-wrap; line-height:1.5;"></div>`);
-        runWindow.document.write(`<script>
-            const cOut = document.getElementById('consoleOut');
-            console.log = (...args) => { cOut.innerHTML += args.map(a => typeof a === 'object' ? JSON.stringify(a,null,2) : a).join(' ') + "\\n"; };
-            console.error = (...args) => { cOut.innerHTML += "<span style='color:#ef4444'>" + args.join(' ') + "</span>\\n"; };
-            try {
-                ${code}
-            } catch(e) {
-                console.error(e.toString());
-            }
-        </script>`);
-    } else if (lang === 'python' || lang === 'py') {
+    if (detectedLang === 'html' || detectedLang === 'htm' || detectedLang === 'xml') {
+        runWindow.document.write(`<div class="content-area">${code}</div>`);
+    } else if (detectedLang === 'css') {
+        runWindow.document.write(`<style>${code}</style><div class="content-area" style="padding:40px; text-align:center;"><h1>تم تطبيق الـ CSS! ✨</h1><p>أضف كود HTML لترى النتيجة كاملة.</p></div>`);
+    } else if (detectedLang === 'js' || detectedLang === 'javascript') {
         runWindow.document.write(`
-            <div id="output" style="padding:20px; font-family:monospace; white-space:pre-wrap; font-size:1.1rem;">جاري تحميل بيئة بايثون (Pyodide)... يرجى الانتظار ⏳</div>
+            <div id="consoleOut" class="console-area"></div>
+            <script>
+                const cOut = document.getElementById('consoleOut');
+                const log = console.log;
+                console.log = (...args) => { 
+                    cOut.innerHTML += args.map(a => typeof a === 'object' ? JSON.stringify(a,null,2) : a).join(' ') + "\\n";
+                    log(...args);
+                };
+                window.onerror = (m, u, l) => { cOut.innerHTML += "<span style='color:#ef4444'>[Error]: " + m + " at line " + l + "</span>\\n"; };
+                try { ${code} } catch(e) { console.log(e.toString()); }
+            </script>
+        `);
+    } else if (detectedLang === 'python' || detectedLang === 'py') {
+        runWindow.document.write(`
+            <div id="output" class="console-area">جاري تحميل بيئة Python (Pyodide)... يرجى الانتظار ⏳</div>
             <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
             <script>
                 async function main() {
                     try {
                         let pyodide = await loadPyodide();
-                        
-                        // Support for input() via window.prompt
-                        pyodide.setStdout({ batched: (msg) => { document.getElementById('output').innerHTML += "<span style='color:#3b82f6'>[مخرجات]:</span> " + msg + "\\n"; } });
-                        pyodide.setStdin({
-                            stdin: () => {
-                              const val = prompt("⌨️ يرجى إدخال مدخلات (input) للكود:");
-                              return val === null ? "" : val;
-                            }
-                        });
-
-                        document.getElementById('output').innerHTML = "<div style='color:#10b981; margin-bottom:15px;'>✅ بيئة جاهزة. جاري تشغيل الكود...</div>";
-                        
+                        document.getElementById('output').innerHTML = "✅ بيئة جاهزة. جاري التشغيل...\\n\\n";
+                        pyodide.setStdout({ batched: (msg) => { document.getElementById('output').innerHTML += msg + "\\n"; } });
                         await pyodide.runPythonAsync(\`${code.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`);
                     } catch (err) {
-                        document.getElementById('output').innerHTML += "\\n\\n<b style='color:#ef4444'>خطأ في الكود:</b>\\n<span style='color:#ef4444'>" + err.toString() + "</span>";
+                        document.getElementById('output').innerHTML += "\\n<span style='color:#ef4444'>[خطأ في بايثون]: " + err.toString() + "</span>";
                     }
                 }
                 main();
             </script>
         `);
     } else {
-        runWindow.document.write(`<div style="padding:20px;">عذراً، محاكي الأكواد لا يدعم تشغيل لغة <strong style="color:#f59e0b">${lang}</strong> حالياً بداخل المتصفح.</div>`);
+        // Fallback for unsupported languages - Show a professional message + Copy button
+        runWindow.document.write(`
+            <div class="error-box">
+                <div class="error-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <h2>بيئة التشغيل المباشرة لا تدعم ${detectedLang} حالياً</h2>
+                <p>يمكنك نسخ الكود وتشغيله في بيئة مخصصة لهذه اللغة.</p>
+                <button class="btn-copy" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(code)}')); this.innerText='تم النسخ ✅'">نسخ الكود</button>
+            </div>
+        `);
     }
 
     runWindow.document.write('</body></html>');
