@@ -919,10 +919,16 @@ window.runCode = (lang, code) => {
 
     // محاولة ذكية لاكتشاف اللغة إذا كانت غير معروفة
     let detectedLang = lang.toLowerCase();
-    if (detectedLang === 'code' || !detectedLang) {
-        if (code.trim().startsWith('<')) detectedLang = 'html';
-        else if (code.includes('import ') || code.includes('def ')) detectedLang = 'python';
-        else if (code.includes('function') || code.includes('const ')) detectedLang = 'javascript';
+    const codeLower = code.toLowerCase().trim();
+    
+    if (detectedLang === 'code' || !detectedLang || detectedLang === 'text') {
+        if (codeLower.includes('<table') || codeLower.includes('<div') || codeLower.includes('<p') || codeLower.includes('<html') || codeLower.includes('<!doctype')) {
+            detectedLang = 'html';
+        } else if (codeLower.includes('import ') || codeLower.includes('def ') || codeLower.includes('print(')) {
+            detectedLang = 'python';
+        } else if (codeLower.includes('function') || codeLower.includes('const ') || codeLower.includes('console.log')) {
+            detectedLang = 'javascript';
+        }
     }
 
     runWindow.document.write(`
@@ -933,27 +939,32 @@ window.runCode = (lang, code) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <style>
-            body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #f8fafc; overflow: hidden; }
-            .navbar { background: #1e293b; padding: 10px 20px; display: flex; justify-content: space-between; align-items:center; border-bottom: 1px solid #334155; }
+            body { margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background: #0f172a; color: #f8fafc; }
+            .navbar { background: #1e293b; padding: 10px 20px; display: flex; justify-content: space-between; align-items:center; border-bottom: 1px solid #334155; position: sticky; top: 0; z-index: 1000; }
             .brand { font-weight: bold; color: #10b981; display: flex; align-items: center; gap: 10px; }
             .lang-tag { background: #334155; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; text-transform: uppercase; }
-            .content-area { height: calc(100vh - 50px); overflow: auto; background: #fff; color: #000; }
-            .console-area { height: calc(100vh - 50px); overflow: auto; background: #000; color: #0f0; padding: 20px; font-family: 'Consolas', monospace; white-space: pre-wrap; }
-            .error-box { padding: 40px; text-align: center; color: #94a3b8; }
-            .error-icon { font-size: 4rem; color: #f59e0b; margin-bottom: 20px; }
-            .btn-copy { background: #10b981; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+            .preview-container { background: #fff; color: #000; min-height: 100vh; }
+            .snippet-wrap { padding: 30px; }
+            table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+            th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .console-area { min-height: 100vh; background: #000; color: #0f0; padding: 20px; font-family: 'Consolas', monospace; white-space: pre-wrap; }
         </style>
     </head>
     <body>
         <div class="navbar">
-            <div class="brand"><i class="fa-solid fa-bolt"></i> MindTY Runtime</div>
+            <div class="brand"><i class="fa-solid fa-bolt"></i> MindTY Preview</div>
             <div class="lang-tag">${detectedLang}</div>
         </div>
     `);
 
     if (detectedLang === 'html' || detectedLang === 'htm' || detectedLang === 'xml') {
-        // Full screen for HTML - just write the code directly!
-        runWindow.document.write(code);
+        // إذا كان الكود لا يحتوي على علامة <html>، نغلفه لكي يظهر بشكل جيد
+        if (!codeLower.includes('<html')) {
+            runWindow.document.write(`<div class="preview-container"><div class="snippet-wrap">${code}</div></div>`);
+        } else {
+            runWindow.document.write(code);
+        }
     } else if (detectedLang === 'css') {
         runWindow.document.write(`<style>${code}</style><div style="padding:40px; text-align:center; font-family:sans-serif;"><h1>تم تطبيق الـ CSS! ✨</h1><p>أضف كود HTML لترى النتيجة كاملة.</p></div>`);
     } else if (detectedLang === 'js' || detectedLang === 'javascript') {
