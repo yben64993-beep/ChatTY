@@ -59,13 +59,72 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(express.static(path.join(__dirname, 'public'), {
-    etag: false,
-    lastModified: false,
-    setHeaders: (res) => {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+const fs = require('fs');
+
+// --- نظام تخزين المواقع المؤقت ---
+// في المستقبل، يمكن استبدال هذا بـ Supabase أو MongoDB
+let publishedSites = {};
+const SITES_FILE = path.join(__dirname, 'sites.json');
+
+// تحميل المواقع المحفوظة مسبقاً إذا كانت موجودة
+if (fs.existsSync(SITES_FILE)) {
+    try {
+        publishedSites = JSON.parse(fs.readFileSync(SITES_FILE, 'utf-8'));
+    } catch (e) {
+        console.error("Error reading sites.json");
     }
-}));
+}
+
+// مسار نشر المواقع من الواجهة
+app.post('/api/publish-site', express.json(), (req, res) => {
+    const { slug, htmlCode } = req.body;
+    
+    if (!slug || !htmlCode) {
+        return res.status(400).json({ error: 'يرجى توفير اسم الموقع والكود.' });
+    }
+
+    const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    
+    publishedSites[cleanSlug] = {
+        htmlCode: htmlCode,
+        createdAt: new Date().toISOString()
+    };
+
+    // حفظ في الملف
+    fs.writeFileSync(SITES_FILE, JSON.stringify(publishedSites));
+
+    res.json({ 
+        success: true, 
+        url: `http://${cleanSlug}.tunismidty.loseyourip.com` 
+    });
+});
+
+// مستشعر الروابط الفرعية (Subdomain Middleware)
+app.use(async (req, res, next) => {
+    const host = req.headers.host;
+    const mainDomains = ['localhost', 'mindty.onrender.com', 'tunismidty.loseyourip.com', '127.0.0.1'];
+    
+    if (host && host.includes('.') && !mainDomains.some(d => host === d || host === 'www.' + d)) {
+        const subdomain = host.split('.')[0].toLowerCase();
+        
+        // البحث عن الموقع في التخزين
+        if (publishedSites[subdomain]) {
+            return res.send(publishedSites[subdomain].htmlCode);
+        } else {
+            return res.status(404).send(`
+                <div style="font-family: sans-serif; text-align: center; margin-top: 20%;">
+                    <h1>موقع ${subdomain} غير موجود 😢</h1>
+                    <p>هذا الموقع لم يتم نشره بعد، أو تم حذفه.</p>
+                    <a href="http://tunismidty.loseyourip.com">العودة إلى MindTY</a>
+                </div>
+            `);
+        }
+    }
+    next();
+});
+
+// إعداد الواجهة الثابتة
+app.use(express.static(path.join(__dirname, 'public'), {
 
 const SYSTEM_PROMPT = `
 أنت مساعد ذكاء اصطناعي متقدم اسمه "MindTY". أنت مساعد ذكي، ودود، ومفيد جداً.
