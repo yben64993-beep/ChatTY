@@ -123,6 +123,12 @@ app.use(async (req, res, next) => {
 
 // إعداد الواجهة الثابتة
 app.use(express.static(path.join(__dirname, 'public'), {
+    etag: false,
+    lastModified: false,
+    setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    }
+}));
 
 const SYSTEM_PROMPT = `
 أنت مساعد ذكاء اصطناعي متقدم اسمه "MindTY". أنت مساعد ذكي، ودود، ومفيد جداً.
