@@ -98,7 +98,7 @@ function formatMarkdown(text) {
             <div class="code-header" style="background:var(--bg-secondary); color:var(--text-secondary); padding:8px 15px; font-size:0.85rem; display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-family:monospace; font-weight:bold; text-transform:uppercase;">${cleanLang}</span>
                 <div style="display:flex; gap:15px;">
-                    ${cleanLang === 'html' ? `<button onclick="window.publishSite(decodeURIComponent('${safeCode}'))" style="background:none; border:none; color:#3b82f6; cursor:pointer; font-family:inherit; font-size: 0.9rem; display:flex; gap:6px; align-items:center; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1"><i class="fa-solid fa-globe"></i> نشر الموقع</button>` : ''}
+                    ${(['html', 'htm', 'xhtml', 'xml', 'php'].includes(cleanLang)) ? `<button onclick="window.publishSite(decodeURIComponent('${safeCode}'))" style="background:none; border:none; color:#3b82f6; cursor:pointer; font-family:inherit; font-size: 0.9rem; display:flex; gap:6px; align-items:center; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1"><i class="fa-solid fa-globe"></i> نشر الموقع</button>` : ''}
                     <button onclick="window.runCode('${cleanLang}', decodeURIComponent('${safeCode}'))" style="background:none; border:none; color:#10b981; cursor:pointer; font-family:inherit; font-size: 0.9rem; display:flex; gap:6px; align-items:center; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1"><i class="fa-solid fa-play"></i> تشغيل</button>
                     <button onclick="navigator.clipboard.writeText(decodeURIComponent('${safeCode}')); const t=document.getElementById('toast'); if(t){t.textContent='تم نسخ الكود!'; t.className='toast show success'; setTimeout(()=>t.className='toast',3000);} else alert('تم النسخ');" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-family:inherit; font-size: 0.9rem; display:flex; gap:6px; align-items:center; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1"><i class="fa-solid fa-copy"></i> نسخ</button>
                 </div>
@@ -952,9 +952,10 @@ window.runCode = (lang, code) => {
     `);
 
     if (detectedLang === 'html' || detectedLang === 'htm' || detectedLang === 'xml') {
-        runWindow.document.write(`<div class="content-area">${code}</div>`);
+        // Full screen for HTML - just write the code directly!
+        runWindow.document.write(code);
     } else if (detectedLang === 'css') {
-        runWindow.document.write(`<style>${code}</style><div class="content-area" style="padding:40px; text-align:center;"><h1>تم تطبيق الـ CSS! ✨</h1><p>أضف كود HTML لترى النتيجة كاملة.</p></div>`);
+        runWindow.document.write(`<style>${code}</style><div style="padding:40px; text-align:center; font-family:sans-serif;"><h1>تم تطبيق الـ CSS! ✨</h1><p>أضف كود HTML لترى النتيجة كاملة.</p></div>`);
     } else if (detectedLang === 'js' || detectedLang === 'javascript') {
         runWindow.document.write(`
             <div id="consoleOut" class="console-area"></div>
