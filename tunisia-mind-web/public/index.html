@@ -60,6 +60,10 @@
                     <i class="fa-solid fa-plus"></i>
                     <span data-i18n="new_chat">محادثة جديدة</span>
                 </button>
+                <button class="new-chat-btn" id="openForgeBtn" style="background:linear-gradient(135deg, #3b82f6, #1d4ed8); color:white; margin-top:8px;">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Forge Studio 🚀</span>
+                </button>
                 <button class="new-chat-btn" id="openArchivesBtn" style="background:var(--bg-tertiary); color:var(--text-primary); margin-top:8px;">
                     <i class="fa-solid fa-box-archive"></i>
                     <span data-i18n="archives">الأرشيف</span>
@@ -115,8 +119,24 @@
             </div>
         </aside>
 
+        <!-- ===== FORGE STUDIO (IFRAME) ===== -->
+        <div id="forgeStudioContainer" style="display:none; flex:1; flex-direction:column; background:var(--bg-primary); position:relative;">
+            <header class="chat-header">
+                <button class="toggle-sidebar-btn" onclick="document.getElementById('toggleSidebarBtn').click()">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="header-center">
+                    <span class="brand-name">MindTY Forge Studio</span>
+                </div>
+                <button class="btn-secondary" onclick="window.closeForgeStudio()" style="margin-inline-start: auto; margin-inline-end: 15px;">
+                    <i class="fa-solid fa-arrow-left"></i> عودة للدردشة
+                </button>
+            </header>
+            <iframe id="forgeIframe" src="about:blank" style="width:100%; height:calc(100vh - 60px); border:none;"></iframe>
+        </div>
+
         <!-- ===== MAIN CHAT ===== -->
-        <main class="main-chat">
+        <main class="main-chat" id="mainChatArea">
             <header class="chat-header">
                 <button class="toggle-sidebar-btn" id="toggleSidebarBtn">
                     <i class="fa-solid fa-bars"></i>
