@@ -98,7 +98,6 @@ function formatMarkdown(text) {
             <div class="code-header" style="background:var(--bg-secondary); color:var(--text-secondary); padding:8px 15px; font-size:0.85rem; display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-family:monospace; font-weight:bold; text-transform:uppercase;">${cleanLang}</span>
                 <div style="display:flex; gap:15px;">
-                    ${(['html', 'htm', 'xhtml', 'xml', 'php'].includes(cleanLang)) ? `<button onclick="window.publishSite(decodeURIComponent('${safeCode}'))" style="background:none; border:none; color:#3b82f6; cursor:pointer; font-family:inherit; font-size: 0.9rem; display:flex; gap:6px; align-items:center; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1"><i class="fa-solid fa-globe"></i> نشر الموقع</button>` : ''}
                     <button onclick="window.runCode('${cleanLang}', decodeURIComponent('${safeCode}'))" style="background:none; border:none; color:#10b981; cursor:pointer; font-family:inherit; font-size: 0.9rem; display:flex; gap:6px; align-items:center; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1"><i class="fa-solid fa-play"></i> تشغيل</button>
                     <button onclick="navigator.clipboard.writeText(decodeURIComponent('${safeCode}')); const t=document.getElementById('toast'); if(t){t.textContent='تم نسخ الكود!'; t.className='toast show success'; setTimeout(()=>t.className='toast',3000);} else alert('تم النسخ');" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-family:inherit; font-size: 0.9rem; display:flex; gap:6px; align-items:center; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1"><i class="fa-solid fa-copy"></i> نسخ</button>
                 </div>
@@ -880,35 +879,6 @@ function initChat() {
 }
 
 // ========== محاكي تشغيل ونشر الأكواد ==========
-
-window.publishSite = async (htmlCode) => {
-    const slug = prompt("اختر اسماً لموقعك (بالحروف الإنجليزية فقط، مثلاً: cafe):", "mysite");
-    if (!slug) return;
-    
-    window.showToast?.('جاري نشر الموقع... ⏳', 'info');
-    
-    try {
-        const response = await fetch('/api/publish-site', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slug, htmlCode })
-        });
-        
-        const data = await response.json();
-        if (data.success) {
-            window.showToast?.('✅ تم النشر بنجاح!', 'success');
-            setTimeout(() => {
-                const confirmed = confirm("تم نشر الموقع! هل تريد زيارته الآن؟\nالرابط: " + data.url);
-                if(confirmed) window.open(data.url, '_blank');
-            }, 1000);
-        } else {
-            window.showToast?.('❌ حدث خطأ: ' + (data.error || 'غير معروف'), 'error');
-        }
-    } catch (e) {
-        console.error(e);
-        window.showToast?.('❌ فشل الاتصال بالخادم', 'error');
-    }
-};
 
 window.runCode = (lang, code) => {
     const runWindow = window.open('', '_blank');
